@@ -1,0 +1,16 @@
+# Local caches and build output
+.cache/
+_site/
+
+# OS, editor and tooling files
+.DS_Store
+.claude/
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+*.log
+
+# Secrets (API keys belong in environment variables, never in the repo)
+.Renviron
+.env

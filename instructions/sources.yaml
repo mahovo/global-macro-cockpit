@@ -1,0 +1,811 @@
+# Global Macro Cockpit — source registry
+# Companion to global-macro-cockpit.md
+#
+# The ingestion layer should iterate `series`, look up the referenced `provider`
+# for access config, and dispatch on provider.access. Validate each series_id
+# resolves before wiring it in. IDs/endpoints are best-known starting points,
+# not guaranteed-current.
+#
+# indicator_class: leading | coincident | lagging | nowcast | derived | overlay
+# access: fred | dbnomics | sdmx | api | csv | scrape | manual | market | transform
+
+meta:
+  version: 0.3
+  emphasis: leading_indicators
+  purpose: monitoring_only          # backtesting is a separate project; no vintages needed here
+  refresh_model: fetch_on_view
+  default_transforms: [level, yoy, mom_annualized, zscore_vs_history, percentile]
+  cache:
+    role: cache_not_warehouse       # latest vintage only; key by series_id + fetched_at
+    strategy: read_through_stale_while_revalidate
+    ttl_by_frequency:               # how long a fetched value stays "fresh" on a view open
+      daily: 6h
+      weekly: 1d
+      monthly: 1d
+      quarterly: 3d
+      event: 1d
+    notes: >
+      Fetch-on-view = serve-if-fresh, fetch-if-stale, revalidate-in-background.
+      Per-provider token-bucket rate limiting + bounded parallel fetch per view.
+      Degrade per tile, not per view. Optionally shorten TTL inside known release
+      windows (BLS/BEA/EIA calendars). Proprietary/manual tiles are written to the
+      same cache out-of-band and just read on view open.
+  notes: >
+    Backbones are FRED (US + market/risk series, free key) and DBnomics
+    (international, no key). Prefer these before any keyed/proprietary source.
+    Keep tight free tiers (alphavantage, googletrends, coingecko public) off the
+    interactive path — long TTL / out-of-band.
+  cockpit_zones:                    # layout layer; map zone -> themes
+    windscreen:   [cycle, financial_conditions, credit, rates, inflation, labor, liquidity]
+    warning_lights: [recession_watch]
+    speedometer:  [bubbles]
+    side_windows: [markets, uncertainty]
+    mirrors:      [consumer, trade]   # plus the lagging rows within other themes
+    weather:      [uncertainty, inflation]
+    gps:          [cycle]             # nowcasts (gdpnow, consensus)
+
+providers:
+  fred:
+    name: "FRED / ALFRED (St. Louis Fed)"
+    base_url: "https://api.stlouisfed.org/fred"
+    auth: api_key            # env: FRED_API_KEY (free)
+    r_client: fredr
+    python_client: fredapi
+    rate_limit: "~120/min (generous) — carry interactive load here"
+    interactive: true
+  dbnomics:
+    name: "DBnomics (Banque de France / CEPREMAP)"
+    base_url: "https://api.db.nomics.world/v22"
+    auth: none
+    r_client: rdbnomics
+    python_client: dbnomics
+    rate_limit: "no key; be polite"
+    interactive: true
+  bls:
+    name: "U.S. Bureau of Labor Statistics"
+    base_url: "https://api.bls.gov/publicAPI/v2"
+    auth: api_key            # env: BLS_API_KEY (free; higher limits)
+    rate_limit: "500/day registered"
+    batch: 50                # up to ~50 series per request — collapse per view
+  bea:
+    name: "U.S. Bureau of Economic Analysis"
+    base_url: "https://apps.bea.gov/api/data"
+    auth: api_key            # env: BEA_API_KEY (free)
+  eia:
+    name: "U.S. Energy Information Administration"
+    base_url: "https://api.eia.gov/v2"
+    auth: api_key            # env: EIA_API_KEY (free)
+  treasury:
+    name: "U.S. Treasury fiscaldata"
+    base_url: "https://api.fiscaldata.treasury.gov/services/api/fiscal_service"
+    auth: none
+  census:
+    name: "U.S. Census Bureau"
+    base_url: "https://api.census.gov/data"
+    auth: api_key            # free
+  oecd:
+    name: "OECD (SDMX)"
+    base_url: "https://sdmx.oecd.org/public/rest"
+    auth: none
+  eurostat:
+    name: "Eurostat (SDMX/REST)"
+    base_url: "https://ec.europa.eu/eurostat/api/dissemination"
+    auth: none
+  ecb:
+    name: "ECB Statistical Data Warehouse (SDMX)"
+    base_url: "https://data-api.ecb.europa.eu/service"
+    auth: none
+  worldbank:
+    name: "World Bank Indicators"
+    base_url: "https://api.worldbank.org/v2"
+    auth: none
+  imf:
+    name: "IMF (SDMX)"
+    base_url: "https://dataservices.imf.org/REST/SDMX_JSON.svc"
+    auth: none
+  bis:
+    name: "Bank for International Settlements"
+    base_url: "https://stats.bis.org"     # also via dbnomics provider 'BIS'
+    auth: none
+  cpb:
+    name: "CPB Netherlands — World Trade Monitor"
+    base_url: "https://www.cpb.nl"
+    auth: none               # Excel download
+  nyfed:
+    name: "Federal Reserve Bank of New York"
+    base_url: "https://www.newyorkfed.org"
+    auth: none               # csv downloads (recession prob, SCE, HHDC)
+  atlantafed:
+    name: "Atlanta Fed — GDPNow"
+    base_url: "https://www.atlantafed.org"
+    auth: none
+  policyuncertainty:
+    name: "Economic Policy Uncertainty"
+    base_url: "https://www.policyuncertainty.com"
+    auth: none
+  gpr:
+    name: "Geopolitical Risk Index (Caldara & Iacoviello)"
+    base_url: "https://www.matteoiacoviello.com/gpr.htm"
+    auth: none
+  shiller:
+    name: "Robert Shiller online data (CAPE)"
+    base_url: "https://shillerdata.com"      # mirror: http://www.econ.yale.edu/~shiller/data.htm
+    auth: none                                # monthly Excel since 1871; multpl.com scrapeable alt
+  finra:
+    name: "FINRA margin statistics (Rule 4521)"
+    base_url: "https://www.finra.org/investors/margin-statistics"
+    auth: none                                # monthly Excel
+  naaim:
+    name: "NAAIM Exposure Index"
+    base_url: "https://www.naaim.org/programs/naaim-exposure-index/"
+    auth: none                                # weekly; scrape
+  coingecko:
+    name: "CoinGecko (crypto)"
+    base_url: "https://api.coingecko.com/api/v3"
+    auth: none                                # free Demo key recommended
+    rate_limit: "public 5-15/min (unstable); free Demo key -> stable 30/min"
+    interactive: caution                      # long TTL; or prefer Finnhub (60/min)
+  googletrends:
+    name: "Google Trends (unofficial)"
+    base_url: "https://trends.google.com"
+    auth: none                                # via pytrends / gtrendsR; unofficial, rate-limited
+    rate_limit: "unofficial; aggressive blocking"
+    interactive: false                        # long TTL, refresh out-of-band only
+  stooq:
+    name: "Stooq (free EOD market data)"
+    base_url: "https://stooq.com/q/d/l/"
+    auth: none               # CSV
+  market_keyed:
+    name: "Keyed free market-data tier (fallback)"
+    options: [finnhub, twelvedata, tiingo, financialmodelingprep, alphavantage]
+    auth: api_key
+    rate_limit: "finnhub ~60/min (best free); alphavantage 25/day & 5/min (avoid for interactive)"
+    interactive: caution                      # prefer finnhub if a keyed source is needed
+  proprietary:
+    name: "Proprietary / headline-only"
+    auth: none               # scrape headline on release; no clean historical API
+
+series:
+  # ---- View A: Recession Watch ----
+  - id: curve_10y_3m
+    provider: fred
+    series_id: T10Y3M
+    theme: recession_watch
+    indicator_class: leading
+    frequency: daily
+  - id: curve_10y_2y
+    provider: fred
+    series_id: T10Y2Y
+    theme: recession_watch
+    indicator_class: leading
+    frequency: daily
+  - id: sahm_realtime
+    provider: fred
+    series_id: SAHMREALTIME
+    theme: recession_watch
+    indicator_class: coincident
+    frequency: monthly
+  - id: recession_prob_chauvet_piger
+    provider: fred
+    series_id: RECPROUSM156N
+    theme: recession_watch
+    indicator_class: coincident
+    frequency: monthly
+  - id: nyfed_curve_recession_prob
+    provider: nyfed
+    endpoint: "/medialibrary/media/research/capital_markets/Prob_Rec.xlsx"
+    theme: recession_watch
+    indicator_class: leading
+    frequency: monthly
+    notes: "Curve-based 12-month-ahead recession probability."
+
+  # ---- View B: Financial Conditions & Liquidity ----
+  - id: nfci
+    provider: fred
+    series_id: NFCI
+    theme: financial_conditions
+    indicator_class: leading
+    frequency: weekly
+  - id: anfci
+    provider: fred
+    series_id: ANFCI
+    theme: financial_conditions
+    indicator_class: leading
+    frequency: weekly
+  - id: stl_financial_stress
+    provider: fred
+    series_id: STLFSI4
+    theme: financial_conditions
+    indicator_class: leading
+    frequency: weekly
+  - id: fed_balance_sheet
+    provider: fred
+    series_id: WALCL
+    theme: liquidity
+    indicator_class: leading
+    frequency: weekly
+  - id: treasury_general_account
+    provider: fred
+    series_id: WTREGEN
+    theme: liquidity
+    indicator_class: leading
+    frequency: weekly
+  - id: reverse_repo
+    provider: fred
+    series_id: RRPONTSYD
+    theme: liquidity
+    indicator_class: leading
+    frequency: daily
+  - id: net_liquidity
+    provider: transform
+    formula: "WALCL - WTREGEN - RRPONTSYD"
+    theme: liquidity
+    indicator_class: derived
+    frequency: weekly
+  - id: m2
+    provider: fred
+    series_id: M2SL
+    theme: liquidity
+    indicator_class: leading
+    frequency: monthly
+  - id: sloos_ci_tightening
+    provider: fred
+    series_id: DRTSCILM
+    theme: credit
+    indicator_class: leading
+    frequency: quarterly
+    notes: "Net % of banks tightening C&I standards (large/medium firms)."
+
+  # ---- View C: Credit & Risk Spreads ----
+  - id: hy_oas
+    provider: fred
+    series_id: BAMLH0A0HYM2
+    theme: credit
+    indicator_class: leading
+    frequency: daily
+  - id: ig_oas
+    provider: fred
+    series_id: BAMLC0A0CM
+    theme: credit
+    indicator_class: leading
+    frequency: daily
+  - id: hy_minus_ig
+    provider: transform
+    formula: "BAMLH0A0HYM2 - BAMLC0A0CM"
+    theme: credit
+    indicator_class: derived
+    frequency: daily
+  - id: move_index
+    provider: proprietary
+    theme: credit
+    indicator_class: leading
+    frequency: daily
+    access: manual
+    notes: "ICE MOVE (bond vol). No free historical API; scrape or proxy with rates vol."
+
+  # ---- View D: Rates & Monetary Policy ----
+  - id: ust_3m
+    provider: fred
+    series_id: DGS3MO
+    theme: rates
+    indicator_class: leading
+    frequency: daily
+  - id: ust_2y
+    provider: fred
+    series_id: DGS2
+    theme: rates
+    indicator_class: leading
+    frequency: daily
+  - id: ust_10y
+    provider: fred
+    series_id: DGS10
+    theme: rates
+    indicator_class: leading
+    frequency: daily
+  - id: effr
+    provider: fred
+    series_id: EFFR
+    theme: rates
+    indicator_class: coincident
+    frequency: daily
+  - id: fed_funds_futures_path
+    provider: proprietary
+    theme: rates
+    indicator_class: leading
+    frequency: daily
+    access: scrape
+    notes: "CME FedWatch implied path. Semi-public; scrape."
+  - id: ecb_policy_rate
+    provider: dbnomics
+    dataset: "ECB/FM"
+    series_match: "deposit facility rate"
+    theme: rates
+    indicator_class: coincident
+    frequency: event
+
+  # ---- View E: Inflation & Expectations ----
+  - id: breakeven_5y
+    provider: fred
+    series_id: T5YIE
+    theme: inflation
+    indicator_class: leading
+    frequency: daily
+  - id: breakeven_10y
+    provider: fred
+    series_id: T10YIE
+    theme: inflation
+    indicator_class: leading
+    frequency: daily
+  - id: breakeven_5y5y_fwd
+    provider: fred
+    series_id: T5YIFR
+    theme: inflation
+    indicator_class: leading
+    frequency: daily
+  - id: umich_inflation_exp_1y
+    provider: fred
+    series_id: MICH
+    theme: inflation
+    indicator_class: leading
+    frequency: monthly
+  - id: cpi_headline
+    provider: fred
+    series_id: CPIAUCSL
+    theme: inflation
+    indicator_class: coincident
+    frequency: monthly
+  - id: cpi_core
+    provider: fred
+    series_id: CPILFESL
+    theme: inflation
+    indicator_class: coincident
+    frequency: monthly
+  - id: pce_core
+    provider: fred
+    series_id: PCEPILFE
+    theme: inflation
+    indicator_class: coincident
+    frequency: monthly
+    notes: "Fed's preferred gauge."
+  - id: ppi_final_demand
+    provider: fred
+    series_id: PPIFIS
+    theme: inflation
+    indicator_class: leading
+    frequency: monthly
+
+  # ---- View F: Cycle & Growth Momentum ----
+  - id: oecd_cli
+    provider: dbnomics
+    dataset: "OECD/MEI_CLI"
+    series_match: "amplitude adjusted, total"
+    theme: cycle
+    indicator_class: leading
+    frequency: monthly
+    notes: "Purpose-built leading indicator; pull OECD + key members."
+  - id: global_pmi_mfg
+    provider: proprietary
+    theme: cycle
+    indicator_class: leading
+    frequency: monthly
+    access: manual
+    notes: "S&P Global / JPMorgan Global PMI. Headline only without license; new-orders subindex is the lead."
+  - id: ism_mfg_new_orders
+    provider: proprietary
+    theme: cycle
+    indicator_class: leading
+    frequency: monthly
+    access: manual
+  - id: conference_board_lei
+    provider: proprietary
+    theme: cycle
+    indicator_class: leading
+    frequency: monthly
+    access: manual
+  - id: empire_state_mfg
+    provider: fred
+    series_id: GACDISA066MSFRBNY
+    theme: cycle
+    indicator_class: leading
+    frequency: monthly
+  - id: philly_fed_mfg
+    provider: fred
+    series_id: GACDFSA066MSFRBPHI
+    theme: cycle
+    indicator_class: leading
+    frequency: monthly
+  - id: gdpnow
+    provider: atlantafed
+    endpoint: "/cqer/research/gdpnow"
+    theme: cycle
+    indicator_class: nowcast
+    frequency: weekly
+  - id: industrial_production
+    provider: fred
+    series_id: INDPRO
+    theme: cycle
+    indicator_class: coincident
+    frequency: monthly
+  - id: real_gdp
+    provider: fred
+    series_id: GDPC1
+    theme: cycle
+    indicator_class: lagging
+    frequency: quarterly
+
+  # ---- View G: Labor Market ----
+  - id: initial_claims
+    provider: fred
+    series_id: ICSA
+    theme: labor
+    indicator_class: leading
+    frequency: weekly
+  - id: continuing_claims
+    provider: fred
+    series_id: CCSA
+    theme: labor
+    indicator_class: leading
+    frequency: weekly
+  - id: jolts_quits_rate
+    provider: fred
+    series_id: JTSQUR
+    theme: labor
+    indicator_class: leading
+    frequency: monthly
+  - id: jolts_openings
+    provider: fred
+    series_id: JTSJOL
+    theme: labor
+    indicator_class: leading
+    frequency: monthly
+  - id: temp_help_employment
+    provider: fred
+    series_id: TEMPHELPS
+    theme: labor
+    indicator_class: leading
+    frequency: monthly
+  - id: avg_weekly_hours_mfg
+    provider: fred
+    series_id: AWHMAN
+    theme: labor
+    indicator_class: leading
+    frequency: monthly
+  - id: nonfarm_payrolls
+    provider: fred
+    series_id: PAYEMS
+    theme: labor
+    indicator_class: coincident
+    frequency: monthly
+  - id: unemployment_rate
+    provider: fred
+    series_id: UNRATE
+    theme: labor
+    indicator_class: lagging
+    frequency: monthly
+
+  # ---- View H: Global Trade & Shipping ----
+  - id: world_trade_monitor
+    provider: cpb
+    endpoint: "/en/worldtrademonitor"
+    theme: trade
+    indicator_class: leading
+    frequency: monthly
+    access: csv
+    notes: "World trade volume + world industrial production; Excel."
+  - id: baltic_dry_index
+    provider: proprietary
+    theme: trade
+    indicator_class: leading
+    frequency: daily
+    access: manual
+    notes: "Baltic Exchange; no free historical API."
+  - id: korea_exports
+    provider: dbnomics
+    dataset: "national source (KR customs)"
+    theme: trade
+    indicator_class: leading
+    frequency: monthly
+    notes: "Early global tech-cycle tell; pair with Taiwan exports."
+
+  # ---- View I: Energy & Commodities ----
+  - id: brent
+    provider: fred
+    series_id: DCOILBRENTEU
+    theme: energy
+    indicator_class: leading
+    frequency: daily
+  - id: wti
+    provider: fred
+    series_id: DCOILWTICO
+    theme: energy
+    indicator_class: leading
+    frequency: daily
+  - id: us_crude_inventories
+    provider: eia
+    route: "petroleum/stoc/wstk"
+    theme: energy
+    indicator_class: leading
+    frequency: weekly
+    notes: "Weekly Petroleum Status Report; includes SPR."
+  - id: henry_hub_gas
+    provider: fred
+    series_id: DHHNGSP
+    theme: energy
+    indicator_class: leading
+    frequency: daily
+  - id: copper_global
+    provider: fred
+    series_id: PCOPPUSDM
+    theme: commodities
+    indicator_class: leading
+    frequency: monthly
+  - id: copper_gold_ratio
+    provider: transform
+    formula: "copper / gold"
+    theme: commodities
+    indicator_class: derived
+    frequency: daily
+    notes: "Growth/reflation regime proxy."
+
+  # ---- View J: Consumer & Housing ----
+  - id: umich_sentiment
+    provider: fred
+    series_id: UMCSENT
+    theme: consumer
+    indicator_class: leading
+    frequency: monthly
+    notes: "1-month publication delay on FRED; UMich direct is timelier."
+  - id: building_permits
+    provider: fred
+    series_id: PERMIT
+    theme: housing
+    indicator_class: leading
+    frequency: monthly
+  - id: housing_starts
+    provider: fred
+    series_id: HOUST
+    theme: housing
+    indicator_class: leading
+    frequency: monthly
+  - id: nahb_sentiment
+    provider: proprietary
+    theme: housing
+    indicator_class: leading
+    frequency: monthly
+    access: manual
+  - id: mba_mortgage_apps
+    provider: proprietary
+    theme: housing
+    indicator_class: leading
+    frequency: weekly
+    access: manual
+  - id: retail_sales_control_group
+    provider: fred
+    series_id: RRSFS
+    theme: consumer
+    indicator_class: coincident
+    frequency: monthly
+  - id: household_debt_delinquency
+    provider: nyfed
+    endpoint: "/microeconomics/hhdc"
+    theme: consumer
+    indicator_class: lagging
+    frequency: quarterly
+
+  # ---- View K: Markets & Sentiment ----
+  - id: sp500
+    provider: fred
+    series_id: SP500
+    theme: markets
+    indicator_class: coincident
+    frequency: daily
+    notes: "FRED limited to ~10y; use Stooq/yfinance (^spx) for full history."
+  - id: vix
+    provider: fred
+    series_id: VIXCLS
+    theme: markets
+    indicator_class: leading
+    frequency: daily
+  - id: broad_usd
+    provider: fred
+    series_id: DTWEXBGS
+    theme: markets
+    indicator_class: leading
+    frequency: daily
+  - id: aaii_sentiment
+    provider: proprietary
+    theme: markets
+    indicator_class: leading
+    frequency: weekly
+    access: scrape
+
+  # ---- View L: China & Cyclical Leaders ----
+  - id: china_credit_impulse
+    provider: transform
+    formula: "12m change in (TSF / nominal GDP)"
+    inputs: ["PBoC total social financing (via dbnomics)", "China nominal GDP"]
+    theme: china
+    indicator_class: derived
+    frequency: monthly
+    notes: "Leads global industrial cycle ~6-12m. Highest-value non-US signal."
+  - id: china_industrial_production
+    provider: dbnomics
+    dataset: "national source (NBS)"
+    theme: china
+    indicator_class: coincident
+    frequency: monthly
+  - id: bis_credit_to_gdp_gap
+    provider: dbnomics
+    dataset: "BIS/..."
+    series_match: "credit-to-GDP gap"
+    theme: china
+    indicator_class: leading
+    frequency: quarterly
+    notes: "Cross-country financial-cycle early-warning."
+
+  # ---- View M: Uncertainty & Geopolitical (overlay) ----
+  - id: epu_us_daily
+    provider: fred
+    series_id: USEPUINDXD
+    theme: uncertainty
+    indicator_class: overlay
+    frequency: daily
+  - id: epu_global
+    provider: fred
+    series_id: GEPUCURRENT
+    theme: uncertainty
+    indicator_class: overlay
+    frequency: monthly
+  - id: geopolitical_risk_index
+    provider: gpr
+    endpoint: "/gpr.htm"
+    theme: uncertainty
+    indicator_class: overlay
+    frequency: monthly
+    access: csv
+
+  # ---- View N: Bubbles / Froth / Fragility (speedometer) ----
+  # Read as speed-vs-conditions / margin-of-safety, NOT as crash timing.
+  - id: shiller_cape
+    provider: shiller
+    endpoint: "/ie_data.xls"
+    theme: bubbles
+    indicator_class: fragility
+    frequency: monthly
+    cockpit_zone: speedometer
+    notes: "CAPE/PE10. ~40 as of mid-2026 (dot-com record ~44). multpl.com is a scrapeable alt."
+  - id: excess_cape_yield
+    provider: transform
+    formula: "(1 / shiller_cape) - DFII10"
+    inputs: [shiller_cape, DFII10]
+    theme: bubbles
+    indicator_class: fragility
+    frequency: monthly
+    cockpit_zone: speedometer
+    notes: "Shiller ECY; accounts for real rates."
+  - id: buffett_indicator
+    provider: transform
+    formula: "WILL5000PRFC / GDP"
+    inputs: [WILL5000PRFC, GDP]
+    theme: bubbles
+    indicator_class: fragility
+    frequency: monthly
+    cockpit_zone: speedometer
+    notes: "Wilshire 5000 to GDP. Frequency mismatch (daily index vs quarterly GDP) — align in view layer."
+  - id: tobins_q
+    provider: transform
+    formula: "nonfin_corp_equity_market_value / nonfin_corp_net_worth"
+    inputs: ["Fed Z.1 via FRED"]
+    theme: bubbles
+    indicator_class: fragility
+    frequency: quarterly
+    cockpit_zone: speedometer
+  - id: finra_margin_debt
+    provider: finra
+    endpoint: "/investors/margin-statistics"
+    theme: bubbles
+    indicator_class: leading
+    frequency: monthly
+    access: csv
+    cockpit_zone: speedometer
+    notes: "Record high ~$1.30T, +53% YoY as of Apr 2026. Track level AND 12m rate-of-change."
+  - id: margin_debt_to_gdp
+    provider: transform
+    formula: "finra_margin_debt / GDP"
+    inputs: [finra_margin_debt, GDP]
+    theme: bubbles
+    indicator_class: fragility
+    frequency: monthly
+    cockpit_zone: speedometer
+  - id: naaim_exposure
+    provider: naaim
+    theme: bubbles
+    indicator_class: leading
+    frequency: weekly
+    access: scrape
+    cockpit_zone: speedometer
+    notes: ">100 implies leveraged-long active managers."
+  - id: real_10y_yield
+    provider: fred
+    series_id: DFII10
+    theme: bubbles
+    indicator_class: overlay
+    frequency: daily
+    cockpit_zone: speedometer
+    notes: "Cheap-money fuel; cross-ref rates/inflation."
+  - id: crypto_total_mktcap
+    provider: coingecko
+    route: "/global"
+    theme: bubbles
+    indicator_class: leading
+    frequency: daily
+    access: api
+    cockpit_zone: speedometer
+    notes: "Speculation barometer. /coins/markets for BTC specifically."
+  - id: concentration_proxy_rsp_spy
+    provider: transform
+    formula: "RSP_price / SPY_price"
+    inputs: ["RSP (equal-weight)", "SPY (cap-weight)"]
+    theme: bubbles
+    indicator_class: leading
+    frequency: daily
+    access: market
+    cockpit_zone: speedometer
+    notes: "Falling ratio = narrowing leadership / concentration. Free proxy for top-heavy market."
+  - id: breadth_pct_above_200dma
+    provider: transform
+    formula: "share of S&P constituents above 200-day MA"
+    inputs: ["constituent prices (Stooq/yfinance)"]
+    theme: bubbles
+    indicator_class: leading
+    frequency: daily
+    access: market
+    cockpit_zone: speedometer
+  - id: google_trends_speculation
+    provider: googletrends
+    theme: bubbles
+    indicator_class: leading
+    frequency: weekly
+    access: api
+    cockpit_zone: speedometer
+    notes: "Basket of speculative search terms; behavioral froth proxy."
+  - id: ipo_spac_issuance
+    provider: proprietary
+    theme: bubbles
+    indicator_class: leading
+    frequency: monthly
+    access: manual
+    cockpit_zone: speedometer
+    notes: "No clean free feed; proxy with Renaissance IPO ETF price/flows."
+  - id: case_shiller_price_rent
+    provider: transform
+    formula: "CSUSHPINSA / CUSR0000SEHA"
+    inputs: [CSUSHPINSA, CUSR0000SEHA]
+    theme: bubbles
+    indicator_class: fragility
+    frequency: monthly
+    cockpit_zone: speedometer
+    notes: "Housing price-to-rent. (Maps the macromicro house-price-vs-rent resource.)"
+  - id: oecd_house_price_to_income
+    provider: dbnomics
+    dataset: "OECD (analytical house prices)"
+    series_match: "price to income ratio"
+    theme: bubbles
+    indicator_class: fragility
+    frequency: quarterly
+    cockpit_zone: speedometer
+  - id: household_debt_service_ratio
+    provider: fred
+    series_id: TDSP
+    theme: bubbles
+    indicator_class: fragility
+    frequency: quarterly
+    cockpit_zone: speedometer
+  - id: froth_composite
+    provider: transform
+    formula: "mean(zscore[shiller_cape, margin_debt_to_gdp, -excess_cape_yield, -concentration_proxy_rsp_spy])"
+    theme: bubbles
+    indicator_class: derived
+    frequency: monthly
+    cockpit_zone: speedometer
+    notes: "Fragility thermometer / summary dial. Read against the windscreen (Views A/B); never an entry/exit trigger."

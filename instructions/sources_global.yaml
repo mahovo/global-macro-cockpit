@@ -1,0 +1,59 @@
+# sources_global.yaml — multi-region additions (Phase G1), merged into the
+# registry by load_registry(). Kept separate so the original manifest is intact.
+# All sources are free/no-key: FRED (OECD-mirrored), OECD SDMX (CLI by area),
+# and the official Eurostat (HICP) and IMF (CPI) APIs. Verified current at build time.
+
+series:
+  # ---- Rates: 10y government bond yields (FRED, OECD mirror) ----
+  - { id: ea_10y, provider: fred, series_id: IRLTLT01EZM156N, theme: rates, indicator_class: leading, frequency: monthly }
+  - { id: de_10y, provider: fred, series_id: IRLTLT01DEM156N, theme: rates, indicator_class: leading, frequency: monthly }
+  - { id: fr_10y, provider: fred, series_id: IRLTLT01FRM156N, theme: rates, indicator_class: leading, frequency: monthly }
+  - { id: it_10y, provider: fred, series_id: IRLTLT01ITM156N, theme: rates, indicator_class: leading, frequency: monthly }
+  - { id: uk_10y, provider: fred, series_id: IRLTLT01GBM156N, theme: rates, indicator_class: leading, frequency: monthly }
+  - { id: jp_10y, provider: fred, series_id: IRLTLT01JPM156N, theme: rates, indicator_class: leading, frequency: monthly }
+  - { id: ca_10y, provider: fred, series_id: IRLTLT01CAM156N, theme: rates, indicator_class: leading, frequency: monthly }
+
+  # ---- Cycle: OECD CLI for developed blocs (SDMX, amplitude-adjusted) ----
+  - { id: cli_g7,      provider: oecd, oecd_area: G7,  theme: cycle, indicator_class: leading, frequency: monthly }
+  - { id: cli_uk,      provider: oecd, oecd_area: GBR, theme: cycle, indicator_class: leading, frequency: monthly }
+  - { id: cli_japan,   provider: oecd, oecd_area: JPN, theme: cycle, indicator_class: leading, frequency: monthly }
+  - { id: cli_germany, provider: oecd, oecd_area: DEU, theme: cycle, indicator_class: leading, frequency: monthly }
+
+  # ---- Leaders (emerging / cyclical leaders): OECD CLI ----
+  - { id: cli_china,  provider: oecd, oecd_area: CHN, theme: leaders, indicator_class: leading, frequency: monthly }
+  - { id: cli_india,  provider: oecd, oecd_area: IND, theme: leaders, indicator_class: leading, frequency: monthly }
+  - { id: cli_korea,  provider: oecd, oecd_area: KOR, theme: leaders, indicator_class: leading, frequency: monthly }
+  - { id: cli_brazil, provider: oecd, oecd_area: BRA, theme: leaders, indicator_class: leading, frequency: monthly }
+
+  # ---- Labor: harmonised unemployment rate (FRED, OECD mirror) ----
+  - { id: unemp_uk,      provider: fred, series_id: LRHUTTTTGBM156S, theme: labor, indicator_class: lagging, frequency: monthly }
+  - { id: unemp_japan,   provider: fred, series_id: LRHUTTTTJPM156S, theme: labor, indicator_class: lagging, frequency: monthly }
+  - { id: unemp_germany, provider: fred, series_id: LRHUTTTTDEM156S, theme: labor, indicator_class: lagging, frequency: monthly }
+
+  # ---- Inflation: HICP annual rate of change (Eurostat API; ECOICOP ver. 2 table
+  #      prc_hicp_minr, which replaced prc_hicp_manr in February 2026) ----
+  - { id: hicp_ea, provider: eurostat, sdmx_flow: prc_hicp_minr, sdmx_key: M.RCH_A.TOTAL.EA20,       theme: inflation, indicator_class: coincident, frequency: monthly }
+  - { id: hicp_eu, provider: eurostat, sdmx_flow: prc_hicp_minr, sdmx_key: M.RCH_A.TOTAL.EU27_2020, theme: inflation, indicator_class: coincident, frequency: monthly }
+  - { id: hicp_de, provider: eurostat, sdmx_flow: prc_hicp_minr, sdmx_key: M.RCH_A.TOTAL.DE,         theme: inflation, indicator_class: coincident, frequency: monthly }
+  - { id: hicp_fr, provider: eurostat, sdmx_flow: prc_hicp_minr, sdmx_key: M.RCH_A.TOTAL.FR,         theme: inflation, indicator_class: coincident, frequency: monthly }
+
+  # ===================== Phase G2 =====================
+  # ---- Rates: 3-month interbank rate (FRED) — current policy-stance proxy ----
+  - { id: rate_3m_euro,   provider: fred, series_id: IR3TIB01EZM156N, theme: rates, indicator_class: coincident, frequency: monthly }
+  - { id: rate_3m_uk,     provider: fred, series_id: IR3TIB01GBM156N, theme: rates, indicator_class: coincident, frequency: monthly }
+  - { id: rate_3m_japan,  provider: fred, series_id: IR3TIB01JPM156N, theme: rates, indicator_class: coincident, frequency: monthly }
+  - { id: rate_3m_canada, provider: fred, series_id: IR3TIB01CAM156N, theme: rates, indicator_class: coincident, frequency: monthly }
+
+  # ---- Inflation / Leaders: CPI % change year on year (IMF data API, CPI dataset;
+  #      runs a few weeks behind the national releases) ----
+  - { id: cpi_uk,    provider: imf, sdmx_flow: "IMF.STA,CPI", sdmx_key: GBR.CPI._T.YOY_PCH_PA_PT.M, theme: inflation, indicator_class: coincident, frequency: monthly }
+  - { id: cpi_japan, provider: imf, sdmx_flow: "IMF.STA,CPI", sdmx_key: JPN.CPI._T.YOY_PCH_PA_PT.M, theme: inflation, indicator_class: coincident, frequency: monthly }
+  - { id: cpi_china, provider: imf, sdmx_flow: "IMF.STA,CPI", sdmx_key: CHN.CPI._T.YOY_PCH_PA_PT.M, theme: leaders,   indicator_class: coincident, frequency: monthly }
+  - { id: cpi_india, provider: imf, sdmx_flow: "IMF.STA,CPI", sdmx_key: IND.CPI._T.YOY_PCH_PA_PT.M, theme: leaders,   indicator_class: coincident, frequency: monthly }
+
+  # ---- PMIs (licensed / headline-only) — flagged manual tiles ----
+  - { id: pmi_euro,  provider: proprietary, access: manual, theme: cycle,   indicator_class: leading, frequency: monthly, url: "https://www.pmi.spglobal.com/", notes: "HCOB / S&P Global euro-area Composite & Manufacturing PMI. 50 = expansion line; the new-orders subindex leads." }
+  - { id: pmi_uk,    provider: proprietary, access: manual, theme: cycle,   indicator_class: leading, frequency: monthly, url: "https://www.pmi.spglobal.com/", notes: "S&P Global UK Composite & Manufacturing PMI. 50 = expansion line." }
+  - { id: pmi_japan, provider: proprietary, access: manual, theme: cycle,   indicator_class: leading, frequency: monthly, url: "https://www.pmi.spglobal.com/", notes: "au Jibun Bank / S&P Global Japan PMI. 50 = expansion line." }
+  - { id: pmi_china, provider: proprietary, access: manual, theme: leaders, indicator_class: leading, frequency: monthly, url: "https://www.pmi.spglobal.com/Public/Release/PressReleases", notes: "Caixin / S&P Global China PMI — the private-sector read (vs official NBS). 50 = expansion line; a key global-cycle tell." }
+  - { id: pmi_india, provider: proprietary, access: manual, theme: leaders, indicator_class: leading, frequency: monthly, url: "https://www.pmi.spglobal.com/", notes: "HSBC / S&P Global India PMI. 50 = expansion line." }
