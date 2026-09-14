@@ -52,7 +52,8 @@ rows <- lapply(series, function(e) {
     id        = e$id,
     provider  = e$provider %||% NA_character_,
     access    = acc,
-    ref       = e$series_id %||% e$sdmx_key %||% e$dataset %||% e$endpoint %||% e$route %||% NA_character_,
+    ref       = e$series_id %||% e$sdmx_key %||% e$api_code %||% e$api_path %||% e$dataset %||%
+                e$endpoint %||% e$route %||% NA_character_,
     theme     = e$theme %||% NA_character_,
     frequency = e$frequency %||% NA_character_,
     status    = out$status,

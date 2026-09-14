@@ -97,14 +97,19 @@ if that happens, re-enable the workflow from the Actions tab.
 
 ## Data and licences
 
-- **Official APIs and downloads only**: FRED, OECD, Eurostat, the ECB Data Portal and the
-  IMF data API. No scraping.
+- **Official APIs and downloads only**: FRED, OECD, Eurostat, the ECB Data Portal, the IMF
+  data API, the Bank of England Database, the ONS and the Bank of Japan's time-series API.
+  No scraping.
 - **`instructions/data_licenses.csv`** records the licence class and credit line of every
   displayed series, checked against FRED's copyright status and the providers' terms:
   - FRED public-domain and citation-required series are republished as
     "Source: … via FRED";
   - OECD and Eurostat data are used under CC BY 4.0; the ECB is cited as the source with
     modifications stated; IMF data is credited per the IMF's data terms;
+  - Bank of England (SONIA) and ONS data are used under the Open Government Licence v3.0
+    with their attribution statements; Bank of Japan data are credited to the Bank, and the
+    site shows the credit line its API terms ask for. Third-party benchmarks such as Euribor
+    are not republished;
   - FRED "pre-approval required" series — S&P 500, ICE BofA high-yield and
     investment-grade spreads (and HY − IG), S&P Cotality Case-Shiller — are link-only on
     the public site.
@@ -134,7 +139,7 @@ R/
   fetch.R                    fetch_series(): provider dispatch -> tidy long; curation overrides
   transforms.R               derived series from whitelisted FRED arithmetic (LOCF alignment)
   fetchers/                  _http.R, _sdmx.R, fred.R, fred_api.R, oecd.R, eurostat.R, ecb.R,
-                             imf.R, dbnomics.R
+                             imf.R, boe.R, ons.R, boj.R, dbnomics.R
   assess.R                   per-series cycle-read thresholds
   display.R                  titles, units, reference lines, formatting, staleness, modes
   tiles.R                    cards, popovers and charts shared by both editions

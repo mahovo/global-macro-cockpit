@@ -45,8 +45,8 @@ TITLE_OVERRIDES <- list(
   hicp_ea = "HICP inflation — Euro area", hicp_eu = "HICP inflation — EU",
   hicp_de = "HICP — Germany", hicp_fr = "HICP — France",
   # global (G2)
-  rate_3m_euro = "3M rate — Euro area", rate_3m_uk = "3M rate — UK",
-  rate_3m_japan = "3M rate — Japan", rate_3m_canada = "3M rate — Canada",
+  rate_3m_euro = "3M govt yield — Euro area (AAA)", rate_3m_uk = "SONIA — UK",
+  rate_3m_japan = "Overnight call rate — Japan", rate_3m_canada = "3M rate — Canada",
   cpi_uk = "CPI inflation — UK", cpi_japan = "CPI inflation — Japan",
   cpi_china = "CPI inflation — China", cpi_india = "CPI inflation — India",
   pmi_euro = "PMI — Euro area", pmi_uk = "PMI — UK", pmi_japan = "PMI — Japan",
@@ -104,10 +104,11 @@ display_unit  <- function(entry) UNITS[[entry$id]] %||% ""
 
 #' Provenance line for a tile footer.
 source_label <- function(entry) {
-  ref <- entry$series_id %||% entry$sdmx_key %||% entry$dataset %||% entry$formula %||% ""
+  ref <- entry$series_id %||% entry$sdmx_key %||% entry$api_code %||% entry$dataset %||% entry$formula %||% ""
   prov <- switch(entry$provider %||% "",
     fred = "FRED", dbnomics = "DBnomics", oecd = "OECD", eurostat = "Eurostat",
-    ecb = "ECB", imf = "IMF", transform = "derived",
+    ecb = "ECB", imf = "IMF", boe = "Bank of England", ons = "ONS", boj = "Bank of Japan",
+    transform = "derived",
     proprietary = "licensed", entry$provider %||% "")
   paste0(prov, if (nzchar(ref)) paste0(" · ", substr(ref, 1, 40)) else "",
          if (!is.null(entry$frequency)) paste0(" · ", entry$frequency) else "")

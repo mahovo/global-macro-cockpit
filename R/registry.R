@@ -27,6 +27,7 @@ PROVIDER_ACCESS <- c(
   eurostat = "sdmx", imf = "sdmx", bis = "dbnomics", transform = "transform",
   proprietary = "manual", treasury = "api", bls = "api", bea = "api",
   eia = "api", census = "api", worldbank = "api", atlantafed = "api",
+  boe = "api", ons = "api", boj = "api",
   cpb = "csv", nyfed = "csv", policyuncertainty = "csv", gpr = "csv",
   shiller = "csv", finra = "csv", naaim = "scrape", coingecko = "api",
   googletrends = "api", stooq = "market", market_keyed = "market"

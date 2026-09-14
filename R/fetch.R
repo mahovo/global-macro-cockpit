@@ -105,7 +105,13 @@ fetch_series <- function(entry, start, end, meta = NULL) {
                   imf      = imf_series(entry$sdmx_flow, entry$sdmx_key, start, end, ttl),
                   stop(sprintf("pending: no sdmx fetcher for provider '%s'", entry$provider), call. = FALSE))
                 else stop("pending: sdmx key not resolved (no override)", call. = FALSE),
-    api       = stop(sprintf("pending: %s api fetcher (later phase)", entry$provider), call. = FALSE),
+    # api: official statistics outside SDMX: Bank of England (`api_code`), ONS
+    # (`api_path`), Bank of Japan (`api_db` + `api_code`); other providers stay pending.
+    api       = switch(entry$provider %||% "",
+                  boe = boe_series(entry$api_code, start, end, ttl),
+                  ons = ons_series(entry$api_path, start, end, ttl),
+                  boj = boj_series(entry$api_db, entry$api_code, start, end, ttl),
+                  stop(sprintf("pending: %s api fetcher (later phase)", entry$provider), call. = FALSE)),
     csv       = stop(sprintf("pending: %s csv fetcher (later phase)", entry$provider), call. = FALSE),
     market    = stop("pending: market fetcher (later phase)", call. = FALSE),
     scrape    = stop("pending: scrape fetcher (later phase)", call. = FALSE),

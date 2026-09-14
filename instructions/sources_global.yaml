@@ -1,11 +1,14 @@
 # sources_global.yaml — multi-region additions (Phase G1), merged into the
 # registry by load_registry(). Kept separate so the original manifest is intact.
-# All sources are free/no-key: FRED (OECD-mirrored), OECD SDMX (CLI by area),
-# and the official Eurostat (HICP) and IMF (CPI) APIs. Verified current at build time.
+# All sources are free/no-key: FRED (OECD-mirrored), OECD SDMX (CLI by area), and the
+# official ECB, Eurostat, IMF, Bank of England, ONS and Bank of Japan data services.
+# Verified current at build time.
 
 series:
   # ---- Rates: 10y government bond yields (FRED, OECD mirror) ----
-  - { id: ea_10y, provider: fred, series_id: IRLTLT01EZM156N, theme: rates, indicator_class: leading, frequency: monthly }
+  # Euro area: the ECB's long-term interest rate for convergence purposes (the FRED mirror
+  # of the OECD series stopped in January 2026).
+  - { id: ea_10y, provider: ecb,  sdmx_flow: IRS, sdmx_key: M.U2.L.L40.CI.0000.EUR.N.Z, theme: rates, indicator_class: leading, frequency: monthly }
   - { id: de_10y, provider: fred, series_id: IRLTLT01DEM156N, theme: rates, indicator_class: leading, frequency: monthly }
   - { id: fr_10y, provider: fred, series_id: IRLTLT01FRM156N, theme: rates, indicator_class: leading, frequency: monthly }
   - { id: it_10y, provider: fred, series_id: IRLTLT01ITM156N, theme: rates, indicator_class: leading, frequency: monthly }
@@ -25,8 +28,9 @@ series:
   - { id: cli_korea,  provider: oecd, oecd_area: KOR, theme: leaders, indicator_class: leading, frequency: monthly }
   - { id: cli_brazil, provider: oecd, oecd_area: BRA, theme: leaders, indicator_class: leading, frequency: monthly }
 
-  # ---- Labor: harmonised unemployment rate (FRED, OECD mirror) ----
-  - { id: unemp_uk,      provider: fred, series_id: LRHUTTTTGBM156S, theme: labor, indicator_class: lagging, frequency: monthly }
+  # ---- Labor: unemployment rate (FRED, OECD mirror; the UK straight from the ONS
+  #      Labour Force Survey, which publishes first) ----
+  - { id: unemp_uk,      provider: ons,  api_path: "/employmentandlabourmarket/peoplenotinwork/unemployment/timeseries/mgsx/lms", theme: labor, indicator_class: lagging, frequency: monthly }
   - { id: unemp_japan,   provider: fred, series_id: LRHUTTTTJPM156S, theme: labor, indicator_class: lagging, frequency: monthly }
   - { id: unemp_germany, provider: fred, series_id: LRHUTTTTDEM156S, theme: labor, indicator_class: lagging, frequency: monthly }
 
@@ -38,10 +42,14 @@ series:
   - { id: hicp_fr, provider: eurostat, sdmx_flow: prc_hicp_minr, sdmx_key: M.RCH_A.TOTAL.FR,         theme: inflation, indicator_class: coincident, frequency: monthly }
 
   # ===================== Phase G2 =====================
-  # ---- Rates: 3-month interbank rate (FRED) — current policy-stance proxy ----
-  - { id: rate_3m_euro,   provider: fred, series_id: IR3TIB01EZM156N, theme: rates, indicator_class: coincident, frequency: monthly }
-  - { id: rate_3m_uk,     provider: fred, series_id: IR3TIB01GBM156N, theme: rates, indicator_class: coincident, frequency: monthly }
-  - { id: rate_3m_japan,  provider: fred, series_id: IR3TIB01JPM156N, theme: rates, indicator_class: coincident, frequency: monthly }
+  # ---- Rates: short-term rates — current policy-stance proxies. The ids date from the
+  #      OECD 3-month interbank series; those stopped or lagged in 2026, so the euro area,
+  #      UK and Japan now come from their central banks: the ECB AAA yield curve (3-month
+  #      spot rate), SONIA (Bank of England) and the overnight call rate (Bank of Japan,
+  #      its policy target). Canada stays on the FRED mirror. ----
+  - { id: rate_3m_euro,   provider: ecb,  sdmx_flow: YC, sdmx_key: B.U2.EUR.4F.G_N_A.SV_C_YM.SR_3M, theme: rates, indicator_class: coincident, frequency: daily }
+  - { id: rate_3m_uk,     provider: boe,  api_code: IUDSOIA, theme: rates, indicator_class: coincident, frequency: daily }
+  - { id: rate_3m_japan,  provider: boj,  api_db: FM01, api_code: STRDCLUCON, theme: rates, indicator_class: coincident, frequency: daily }
   - { id: rate_3m_canada, provider: fred, series_id: IR3TIB01CAM156N, theme: rates, indicator_class: coincident, frequency: monthly }
 
   # ---- Inflation / Leaders: CPI % change year on year (IMF data API, CPI dataset;
