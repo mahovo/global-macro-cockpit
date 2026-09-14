@@ -98,8 +98,8 @@ if that happens, re-enable the workflow from the Actions tab.
 ## Data and licences
 
 - **Official APIs and downloads only**: FRED, OECD, Eurostat, the ECB Data Portal, the IMF
-  data API, the Bank of England Database, the ONS and the Bank of Japan's time-series API.
-  No scraping.
+  data API, the Bank of England Database, the ONS, the Bank of Japan's time-series API and
+  New York Fed data downloads. No scraping.
 - **`instructions/data_licenses.csv`** records the licence class and credit line of every
   displayed series, checked against FRED's copyright status and the providers' terms:
   - FRED public-domain and citation-required series are republished as
@@ -115,8 +115,13 @@ if that happens, re-enable the workflow from the Actions tab.
     the public site.
 - **`scripts/audit_licenses.R`** re-checks FRED's copyright status for the table (needs
   `FRED_API_KEY`) and reports differences for review; it never edits the table.
-- Licensed, headline-only indicators (PMIs, ISM, LEI, NAHB, MBA, Baltic Dry, MOVE,
-  IPO/SPAC) are linked, never fetched.
+- Licensed, headline-only indicators (the regional PMIs and IPO/SPAC issuance) are linked,
+  never fetched. The other licensed indicators in the original design were replaced with
+  free official series: realized 10-year Treasury volatility for the MOVE index, core capital
+  goods orders for ISM new orders, the OECD US leading indicator for the Conference Board
+  LEI, the New York Fed Global Supply Chain Pressure Index for the Baltic Dry Index, new
+  home sales for NAHB sentiment and the 30-year mortgage rate for MBA applications. The
+  global PMI tile was dropped.
 - This product uses the FRED® API but is not endorsed or certified by the Federal Reserve
   Bank of St. Louis.
 
@@ -159,6 +164,8 @@ instructions/
 ## Adding a series
 
 1. Add it to `instructions/sources_global.yaml` and run `Rscript scripts/validate_registry.R`.
+   To swap out a series from the original manifest, give the new entry `replaces: <id>` (it
+   takes that tile's place); list ids to hide under `retired`.
 2. Give it a title, unit and reference line in `R/display.R`, a cycle read in
    `R/assess.R`, and help text in `R/help.R`.
 3. Add a row to `instructions/data_licenses.csv` after checking its licence. Until it has

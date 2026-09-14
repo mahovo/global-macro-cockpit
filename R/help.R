@@ -36,7 +36,7 @@ CARD_HELP <- list(
   hy_oas = "High-yield credit spread (option-adjusted) — the market's real-time credit-stress thermometer. Under ~3% = complacent/risk-on; past ~5% signals rising stress; >8% is risk-off.",
   ig_oas = "Investment-grade credit spread. Lower-beta than HY but the same signal: widening = tightening conditions and rising risk aversion, often before equities react.",
   hy_minus_ig = "Riskiest credit minus safer credit (HY − IG). Compression = reach-for-yield/complacency; decompression (widening) means investors are discriminating on risk — an early stress tell.",
-  move_index = "ICE MOVE — bond-market implied volatility, the 'VIX for rates.' Spikes signal rate/funding stress. Licensed data: shown as a manual tile; check the headline on release.",
+  ust10y_realized_vol = "Realized volatility of the 10-year Treasury yield: the standard deviation of daily yield changes over the past month, annualized, in basis points. A free, backward-looking stand-in for the ICE MOVE index (implied volatility); spikes flag rate and funding stress.",
   # --- rates ---
   ust_3m = "3-month Treasury yield — effectively the front-end / policy-rate proxy and the short anchor of the recession curve.",
   ust_2y = "2-year Treasury yield — the market's expected average policy rate over ~2 years. A falling 2y often front-runs Fed cuts.",
@@ -54,9 +54,8 @@ CARD_HELP <- list(
   ppi_final_demand = "Producer prices (final demand) — pipeline/input-cost inflation that often leads consumer prices. A look upstream of CPI.",
   # --- cycle ---
   oecd_cli = "OECD Composite Leading Indicator (G20) — purpose-built to anticipate turning points. 100 = trend; above & rising = expansion; rolling below 100 flags a slowdown. Broad global read incl. China/India.",
-  global_pmi_mfg = "Global manufacturing PMI — the new-orders subindex is among the best leading signals. 50 = expansion/contraction line. Licensed: manual tile.",
-  ism_mfg_new_orders = "US ISM manufacturing new orders — forward-looking factory demand. Above 50 = growing; a leading turn signal. Licensed: manual tile.",
-  conference_board_lei = "Conference Board Leading Economic Index — a composite of 10 leading series. Sustained declines have preceded recessions. Licensed: manual tile.",
+  core_capex_orders = "New orders for nondefense capital goods excluding aircraft (Census) — companies' investment plans, a classic leading indicator for capex and factory activity. Watch the trend over several months; single months are noisy.",
+  cli_usa = "OECD composite leading indicator for the US — designed to signal turning points in activity about six to nine months ahead. 100 = trend; below & falling flags a slowdown.",
   empire_state_mfg = "NY Fed (Empire State) manufacturing survey — an early regional read on factory activity. Volatile but timely; >0 = expansion.",
   philly_fed_mfg = "Philadelphia Fed manufacturing survey — another early regional factory gauge. Pairs with Empire State to preview national ISM/IP.",
   industrial_production = "Industrial production — actual factory/mine/utility output. Coincident; confirms what the surveys led.",
@@ -71,7 +70,7 @@ CARD_HELP <- list(
   nonfarm_payrolls = "Nonfarm payrolls — the monthly 'big one.' Coincident, but large surprises move markets sharply.",
   unemployment_rate = "Unemployment rate — lagging (it rises after a downturn is underway), but feeds the Sahm rule and the Fed's mandate.",
   # --- trade / energy / commodities ---
-  baltic_dry_index = "Baltic Dry Index — the cost of shipping bulk raw materials, a real-time proxy for global industrial demand. Licensed/real-time: manual tile; falling = softening demand.",
+  gscpi = "New York Fed Global Supply Chain Pressure Index — shipping costs, delivery times, backlogs and inventories combined, in standard deviations from the historical average. Above 1 = strained supply chains and cost-push inflation risk; below 0 = slack. Recent months are revised with each monthly update.",
   brent = "Brent crude — the global oil benchmark. Rising oil is both a demand signal and an inflation/cost input; spikes can tip the cycle.",
   wti = "WTI crude — the US oil benchmark. Same read as Brent; the Brent–WTI gap reflects US vs global supply/demand.",
   henry_hub_gas = "Henry Hub natural gas — the US gas price. Drives heating/industrial input costs; very weather- and storage-sensitive.",
@@ -81,8 +80,8 @@ CARD_HELP <- list(
   retail_sales_control_group = "Retail sales 'control group' (ex autos/gas/building materials) — the cleanest consumer-spending read, feeding directly into GDP. Coincident.",
   building_permits = "Building permits — the earliest housing signal (you permit before you build). Rate-sensitive and a classic cycle leader.",
   housing_starts = "Housing starts — construction actually begun. Housing turns first in the cycle; starts follow permits.",
-  nahb_sentiment = "NAHB homebuilder sentiment — builders' real-time read on demand/traffic, leading starts and permits. Licensed: manual tile.",
-  mba_mortgage_apps = "MBA mortgage purchase applications — weekly, rate-sensitive demand for home loans; an early read on housing. Licensed: manual tile.",
+  new_home_sales = "New single-family home sales (Census; seasonally adjusted annual rate, thousands) — builders' real-time demand and a leading read on housing activity; highly rate-sensitive.",
+  mortgage_rate_30y = "Average 30-year fixed mortgage rate (Freddie Mac weekly survey) — the price of housing credit; rising rates cool purchase demand within weeks.",
   # --- markets / uncertainty ---
   sp500 = "S&P 500 — the broad US equity market, which discounts the future and is itself a leading indicator. (FRED history is ~10y.)",
   vix = "VIX — S&P 500 implied volatility, the market's 'fear gauge.' Calm under ~20; >20 elevated; >30 signals stress/risk-off.",
@@ -92,7 +91,7 @@ CARD_HELP <- list(
   # --- bubbles ---
   buffett_indicator = "Corporate equity value ÷ GDP (the Z.1 'Buffett indicator') — how richly the whole market is valued vs the economy. ~1.0 historically normal; ~2.0+ is very stretched. Read as low margin of safety, not crash timing.",
   real_10y_yield = "10-year TIPS (real) yield — the inflation-adjusted cost of money and the 'cheap-money fuel' gauge. Deeply negative real yields inflate valuations; rising real yields deflate them.",
-  ipo_spac_issuance = "IPO/SPAC issuance — speculative supply that floods in at manias and dries up in busts. Licensed: manual tile (proxy via the Renaissance IPO ETF).",
+  ipo_spac_issuance = "IPO & SPAC issuance — speculative supply that floods in at manias and dries up in busts. No free, republishable data; the tile links to public trackers.",
   case_shiller_price_rent = "Home price-to-rent ratio — housing's valuation gauge (a P/E for houses). Far above its history = stretched and rate-sensitive; same 'margin of safety' read as equity valuation.",
   household_debt_service_ratio = "Household debt-service ratio — debt payments as a share of disposable income. Rising = households more fragile to shocks; a slow-burning systemic-risk gauge.",
   # --- global (G1) ---

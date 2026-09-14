@@ -50,7 +50,12 @@ TITLE_OVERRIDES <- list(
   cpi_uk = "CPI inflation — UK", cpi_japan = "CPI inflation — Japan",
   cpi_china = "CPI inflation — China", cpi_india = "CPI inflation — India",
   pmi_euro = "PMI — Euro area", pmi_uk = "PMI — UK", pmi_japan = "PMI — Japan",
-  pmi_china = "PMI — China (Caixin)", pmi_india = "PMI — India"
+  pmi_china = "PMI — China (Caixin)", pmi_india = "PMI — India",
+  # free replacements for licensed manual tiles
+  ust10y_realized_vol = "10Y Treasury volatility (realized)", core_capex_orders = "Core capital goods orders",
+  cli_usa = "OECD CLI — US", gscpi = "Global supply chain pressure (NY Fed)",
+  new_home_sales = "New home sales", mortgage_rate_30y = "30Y mortgage rate",
+  ipo_spac_issuance = "IPO & SPAC issuance"
 )
 
 # Reference lines drawn on the mini-chart, where a meaningful threshold exists.
@@ -61,7 +66,8 @@ REF_LINES <- list(
   cli_g7 = 100, cli_uk = 100, cli_japan = 100, cli_germany = 100,
   cli_china = 100, cli_india = 100, cli_korea = 100, cli_brazil = 100,
   hicp_ea = 2, hicp_eu = 2, hicp_de = 2, hicp_fr = 2,
-  cpi_uk = 2, cpi_japan = 2, cpi_china = 2, cpi_india = 2
+  cpi_uk = 2, cpi_japan = 2, cpi_china = 2, cpi_india = 2,
+  cli_usa = 100, gscpi = 0
 )
 
 # Short unit suffixes for the value headline. "k" = thousands (FRED convention
@@ -95,7 +101,10 @@ UNITS <- list(
   hicp_ea = "%", hicp_eu = "%", hicp_de = "%", hicp_fr = "%",
   # global (G2)
   rate_3m_euro = "%", rate_3m_uk = "%", rate_3m_japan = "%", rate_3m_canada = "%",
-  cpi_uk = "%", cpi_japan = "%", cpi_china = "%", cpi_india = "%"
+  cpi_uk = "%", cpi_japan = "%", cpi_china = "%", cpi_india = "%",
+  # free replacements for licensed manual tiles
+  ust10y_realized_vol = "bp", core_capex_orders = "$M", new_home_sales = "k",
+  mortgage_rate_30y = "%", gscpi = "σ"
 )
 
 display_title <- function(entry) TITLE_OVERRIDES[[entry$id]] %||% prettify_id(entry$id)

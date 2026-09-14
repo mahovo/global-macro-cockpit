@@ -65,3 +65,35 @@ series:
   - { id: pmi_japan, provider: proprietary, access: manual, theme: cycle,   indicator_class: leading, frequency: monthly, url: "https://www.pmi.spglobal.com/", notes: "au Jibun Bank / S&P Global Japan PMI. 50 = expansion line." }
   - { id: pmi_china, provider: proprietary, access: manual, theme: leaders, indicator_class: leading, frequency: monthly, url: "https://www.pmi.spglobal.com/Public/Release/PressReleases", notes: "Caixin / S&P Global China PMI — the private-sector read (vs official NBS). 50 = expansion line; a key global-cycle tell." }
   - { id: pmi_india, provider: proprietary, access: manual, theme: leaders, indicator_class: leading, frequency: monthly, url: "https://www.pmi.spglobal.com/", notes: "HSBC / S&P Global India PMI. 50 = expansion line." }
+
+  # ================== Free replacements for licensed manual tiles ==================
+  # The manifest lists these as headline-only manual tiles because their publishers
+  # license the data. An entry with `replaces` takes the manifest tile's place (same tab
+  # and position): MOVE -> realized 10Y Treasury volatility (computed from FRED DGS10 in
+  # R/fetch.R), ISM new orders -> core capital goods orders, Conference Board LEI -> OECD
+  # CLI for the US, Baltic Dry -> NY Fed Global Supply Chain Pressure Index, NAHB -> new
+  # home sales, MBA applications -> 30-year mortgage rate. IPO/SPAC issuance stays a
+  # manual tile, now with links to free trackers.
+  - { id: ust10y_realized_vol, replaces: move_index,           provider: transform, inputs: [DGS10], theme: credit, indicator_class: leading, frequency: daily }
+  - { id: core_capex_orders,   replaces: ism_mfg_new_orders,   provider: fred, series_id: NEWORDER, theme: cycle, indicator_class: leading, frequency: monthly }
+  - { id: cli_usa,             replaces: conference_board_lei, provider: oecd, oecd_area: USA, theme: cycle, indicator_class: leading, frequency: monthly }
+  - { id: gscpi,               replaces: baltic_dry_index,     provider: nyfed, access: api, api_path: "/medialibrary/research/interactives/data/gscpi/gscpi_interactive_data.csv", theme: trade, indicator_class: leading, frequency: monthly }
+  - { id: new_home_sales,      replaces: nahb_sentiment,       provider: fred, series_id: HSN1F, theme: housing, indicator_class: leading, frequency: monthly }
+  - { id: mortgage_rate_30y,   replaces: mba_mortgage_apps,    provider: fred, series_id: MORTGAGE30US, theme: housing, indicator_class: leading, frequency: weekly }
+  - id: ipo_spac_issuance
+    replaces: ipo_spac_issuance
+    provider: proprietary
+    access: manual
+    theme: bubbles
+    indicator_class: leading
+    frequency: monthly
+    cockpit_zone: speedometer
+    notes: "No free, republishable feed. Public trackers:"
+    links:
+      - { label: "US IPO market stats (Renaissance Capital)", url: "https://www.renaissancecapital.com/IPO-Center/Stats" }
+      - { label: "SPAC market stats (SPACInsider)", url: "https://www.spacinsider.com/data/stats" }
+
+# Manifest tiles removed from the dashboard. The global PMI is licensed, and the OECD G20
+# leading indicator (oecd_cli) already covers the global cycle.
+retired:
+  - global_pmi_mfg

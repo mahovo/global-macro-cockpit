@@ -117,7 +117,7 @@ ui <- page_sidebar(
       span(class = "badge text-bg-danger", "bad"), " recession signal "),
     hr(),
     helpText(class = "small",
-      "Leading-indicator-first. Data: FRED, OECD, Eurostat, ECB, IMF, Bank of England, ONS, Bank of Japan (public APIs). ",
+      "Leading-indicator-first. Data: FRED, OECD, Eurostat, ECB, IMF, Bank of England, ONS, Bank of Japan, New York Fed (public APIs). ",
       "Manual tiles are licensed/headline-only. Not investment advice."),
     div(class = "small text-muted",
       "Co-written by Claude Code Opus 5", br(), "Directed by Martin Hoshi Vognsen")

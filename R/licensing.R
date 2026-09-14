@@ -7,7 +7,7 @@
 # are shown as link-only tiles, so a newly added series can't leak data by accident.
 
 PUBLISHABLE_CLASSES <- c("public-domain", "citation-required", "cc-by-4.0",
-                         "ecb-terms", "imf-data-terms", "ogl-3.0", "boj-terms")
+                         "ecb-terms", "imf-data-terms", "ogl-3.0", "boj-terms", "nyfed-terms")
 
 load_licenses <- function(path = file.path(getwd(), "instructions", "data_licenses.csv")) {
   if (!file.exists(path)) {

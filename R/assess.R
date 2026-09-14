@@ -117,6 +117,15 @@ assess_copper <- function(df) {         # 3-month momentum
   else               list(text = "Flat", tone = "neutral")
 }
 
+assess_gscpi <- function(df) {          # standard deviations from the historical average
+  v <- .last(df)
+  if (is.na(v))      list(text = "No data", tone = "neutral")
+  else if (v >= 2)   list(text = "Severe pressure", tone = "bad")
+  else if (v >= 1)   list(text = "Elevated pressure", tone = "warn")
+  else if (v >= -1)  list(text = "Normal range", tone = "good")
+  else               list(text = "Slack", tone = "neutral")
+}
+
 # series_id -> assessor
 ASSESSORS <- list(
   curve_10y_3m = assess_curve, curve_10y_2y = assess_curve,
@@ -133,7 +142,9 @@ ASSESSORS <- list(
   cli_china = assess_cli, cli_india = assess_cli, cli_korea = assess_cli, cli_brazil = assess_cli,
   hicp_ea = assess_cpi, hicp_eu = assess_cpi, hicp_de = assess_cpi, hicp_fr = assess_cpi,
   # global (G2)
-  cpi_uk = assess_cpi, cpi_japan = assess_cpi, cpi_china = assess_cpi, cpi_india = assess_cpi
+  cpi_uk = assess_cpi, cpi_japan = assess_cpi, cpi_china = assess_cpi, cpi_india = assess_cpi,
+  # free replacements for licensed manual tiles
+  cli_usa = assess_cli, gscpi = assess_gscpi
 )
 
 #' Assessor for a series id, or NULL.

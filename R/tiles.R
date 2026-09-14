@@ -81,16 +81,21 @@ tile_shell <- function(entry, ..., badge = entry$indicator_class %||% "",
   )
 }
 
-# Licensed / headline-only tile: no data, a short note and an optional link.
+# Licensed / headline-only tile: no data, a short note and links. `links` (a list of
+# label + url) wins over a single `url`, which falls back to the provider's site.
 manual_tile <- function(entry, providers = NULL, footer = source_label(entry)) {
-  prov <- providers[[entry$provider %||% ""]]
-  link <- entry$url %||% prov$base_url
+  prov  <- providers[[entry$provider %||% ""]]
+  links <- entry$links %||% {
+    url <- entry$url %||% prov$base_url
+    if (is.null(url)) list() else list(list(label = "Latest release ›", url = url))
+  }
   tile_shell(entry, badge = "manual", badge_class = "text-bg-secondary", footer = footer,
     htmltools::div(class = "text-muted small mb-2", "Licensed / headline-only — not auto-fetched."),
     if (!is.null(entry$notes)) htmltools::div(class = "small mb-2", entry$notes),
-    if (!is.null(link))
-      htmltools::div(class = "small",
-        htmltools::tags$a(href = link, target = "_blank", rel = "noopener", "Latest release ›"))
+    if (length(links))
+      htmltools::div(class = "small d-flex flex-column gap-1",
+        lapply(links, function(l)
+          htmltools::tags$a(href = l$url, target = "_blank", rel = "noopener", l$label)))
   )
 }
 

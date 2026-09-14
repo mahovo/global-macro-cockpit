@@ -10,15 +10,36 @@ registry_path <- function() file.path(getwd(), "instructions", "sources.yaml")
 #' Load the registry. Returns a list with $meta, $providers, $series.
 #' Read as UTF-8 explicitly (the YAML contains em-dashes/≈/arrows) so parsing
 #' doesn't depend on the system locale. Series from sources_global.yaml (our
-#' multi-region additions) are appended, keeping the user's manifest untouched.
+#' additions and curation) are merged in, keeping the user's manifest untouched.
 load_registry <- function(path = registry_path()) {
   reg <- yaml::yaml.load(readr::read_file(path))
   gpath <- file.path(dirname(path), "sources_global.yaml")
   if (file.exists(gpath)) {
     g <- yaml::yaml.load(readr::read_file(gpath))
-    if (!is.null(g$series)) reg$series <- c(reg$series, g$series)
+    reg$series <- merge_curated(reg$series, g$series, unlist(g$retired))
   }
   reg
+}
+
+#' Merge curated series into the manifest's. An entry with `replaces: <id>` takes the
+#' place of that manifest series (same tab, same position); other entries are appended.
+#' Ids listed under `retired` are dropped.
+merge_curated <- function(series, curated = NULL, retired = NULL) {
+  ids <- vapply(series, function(e) e$id %||% "", "")
+  for (e in curated) {
+    at <- if (is.null(e$replaces)) integer(0) else which(ids == e$replaces)
+    if (!is.null(e$replaces) && !length(at)) {
+      warning(sprintf("sources_global.yaml: '%s' replaces unknown id '%s'", e$id, e$replaces), call. = FALSE)
+    }
+    if (length(at)) {
+      for (i in at) series[[i]] <- e
+      ids[at] <- e$id
+    } else {
+      series[[length(series) + 1]] <- e
+      ids <- c(ids, e$id)
+    }
+  }
+  series[!(ids %in% retired)]
 }
 
 # Map a provider -> its default access method when a series omits `access`.

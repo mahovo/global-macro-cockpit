@@ -43,6 +43,21 @@ ENTRY_OVERRIDES <- list(
     fetch  = function(start, end, ttl)
       ecb_series("FM", "B.U2.EUR.4F.KR.DFR.LEV", start, end, ttl)
   ),
+  # Realized 10-year Treasury yield volatility, a free stand-in for the licensed ICE MOVE
+  # index (implied volatility): the standard deviation of daily yield changes over 21
+  # trading days, annualized, in basis points.
+  ust10y_realized_vol = list(
+    access = "transform",
+    fetch  = function(start, end, ttl) {
+      y   <- fred_series("DGS10", as.Date(start) - 45, end, ttl = ttl)
+      chg <- c(NA, diff(y$value)) * 100                  # daily change, bp
+      vol <- vapply(seq_along(chg), function(i)
+        if (i > 21) stats::sd(chg[(i - 20):i]) * sqrt(252) else NA_real_, numeric(1))
+      tibble::tibble(date = y$date, value = vol) |>
+        dplyr::filter(!is.na(value), date >= as.Date(start)) |>
+        dplyr::arrange(date)
+    }
+  ),
   # Buffett indicator: the registry's Wilshire id (WILL5000PRFC) 404s on the
   # keyless endpoint. Use the Z.1 corporate-equity market value (NCBEILQ027S,
   # $M) over GDP ($B) — the cleaner flow-of-funds version of the same gauge.
@@ -106,11 +121,13 @@ fetch_series <- function(entry, start, end, meta = NULL) {
                   stop(sprintf("pending: no sdmx fetcher for provider '%s'", entry$provider), call. = FALSE))
                 else stop("pending: sdmx key not resolved (no override)", call. = FALSE),
     # api: official statistics outside SDMX: Bank of England (`api_code`), ONS
-    # (`api_path`), Bank of Japan (`api_db` + `api_code`); other providers stay pending.
+    # (`api_path`), Bank of Japan (`api_db` + `api_code`), New York Fed downloads
+    # (`api_path`); other providers stay pending.
     api       = switch(entry$provider %||% "",
-                  boe = boe_series(entry$api_code, start, end, ttl),
-                  ons = ons_series(entry$api_path, start, end, ttl),
-                  boj = boj_series(entry$api_db, entry$api_code, start, end, ttl),
+                  boe   = boe_series(entry$api_code, start, end, ttl),
+                  ons   = ons_series(entry$api_path, start, end, ttl),
+                  boj   = boj_series(entry$api_db, entry$api_code, start, end, ttl),
+                  nyfed = nyfed_series(entry$api_path, start, end, ttl),
                   stop(sprintf("pending: %s api fetcher (later phase)", entry$provider), call. = FALSE)),
     csv       = stop(sprintf("pending: %s csv fetcher (later phase)", entry$provider), call. = FALSE),
     market    = stop("pending: market fetcher (later phase)", call. = FALSE),
