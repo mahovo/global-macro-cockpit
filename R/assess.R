@@ -117,6 +117,14 @@ assess_copper <- function(df) {         # 3-month momentum
   else               list(text = "Flat", tone = "neutral")
 }
 
+assess_stocks_bonds <- function(df) {   # earnings yield minus real 10Y yield, pp
+  v <- .last(df)
+  if (is.na(v))     list(text = "No data", tone = "neutral")
+  else if (v < 0)   list(text = "Crossed — bonds out-yield stocks", tone = "bad")
+  else if (v < 1)   list(text = "Close to crossing", tone = "warn")
+  else              list(text = "Stocks out-yield bonds", tone = "good")
+}
+
 assess_gscpi <- function(df) {          # standard deviations from the historical average
   v <- .last(df)
   if (is.na(v))      list(text = "No data", tone = "neutral")
@@ -144,7 +152,7 @@ ASSESSORS <- list(
   # global (G2)
   cpi_uk = assess_cpi, cpi_japan = assess_cpi, cpi_china = assess_cpi, cpi_india = assess_cpi,
   # free replacements for licensed manual tiles
-  cli_usa = assess_cli, gscpi = assess_gscpi
+  cli_usa = assess_cli, gscpi = assess_gscpi, stocks_vs_bonds_real = assess_stocks_bonds
 )
 
 #' Assessor for a series id, or NULL.

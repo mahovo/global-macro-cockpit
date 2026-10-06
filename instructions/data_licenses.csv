@@ -94,3 +94,4 @@
 "gscpi","nyfed","NYFed/GSCPI","nyfed-terms","Source: Federal Reserve Bank of New York, Global Supply Chain Pressure Index","https://www.newyorkfed.org/research/policy/gscpi"
 "new_home_sales","fred","HSN1F","public-domain","Source: U.S. Census Bureau; U.S. Department of Housing and Urban Development via FRED","https://fred.stlouisfed.org/series/HSN1F"
 "mortgage_rate_30y","fred","MORTGAGE30US","citation-required","Source: Freddie Mac via FRED","https://fred.stlouisfed.org/series/MORTGAGE30US"
+"stocks_vs_bonds_real","transform","NFCPATAX;NCBEILQ027S;DGS10;EXPINF10YR","public-domain","Source: U.S. Bureau of Economic Analysis; Federal Reserve Board; Federal Reserve Bank of Cleveland via FRED; gap computed by this site","https://fred.stlouisfed.org/series/NFCPATAX;https://fred.stlouisfed.org/series/NCBEILQ027S;https://fred.stlouisfed.org/series/DGS10;https://fred.stlouisfed.org/series/EXPINF10YR"

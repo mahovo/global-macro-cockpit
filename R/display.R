@@ -55,7 +55,8 @@ TITLE_OVERRIDES <- list(
   ust10y_realized_vol = "10Y Treasury volatility (realized)", core_capex_orders = "Core capital goods orders",
   cli_usa = "OECD CLI — US", gscpi = "Global supply chain pressure (NY Fed)",
   new_home_sales = "New home sales", mortgage_rate_30y = "30Y mortgage rate",
-  ipo_spac_issuance = "IPO & SPAC issuance"
+  ipo_spac_issuance = "IPO & SPAC issuance",
+  stocks_vs_bonds_real = "Stocks vs bonds (real)"
 )
 
 # Reference lines drawn on the mini-chart, where a meaningful threshold exists.
@@ -104,7 +105,7 @@ UNITS <- list(
   cpi_uk = "%", cpi_japan = "%", cpi_china = "%", cpi_india = "%",
   # free replacements for licensed manual tiles
   ust10y_realized_vol = "bp", core_capex_orders = "$M", new_home_sales = "k",
-  mortgage_rate_30y = "%", gscpi = "σ"
+  mortgage_rate_30y = "%", gscpi = "σ", stocks_vs_bonds_real = "pp"
 )
 
 display_title <- function(entry) TITLE_OVERRIDES[[entry$id]] %||% prettify_id(entry$id)

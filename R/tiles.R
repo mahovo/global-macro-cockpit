@@ -4,7 +4,6 @@
 TONE_COLOUR <- c(good = "#2e7d32", warn = "#ed6c02", bad = "#c62828", neutral = "#607d8b")
 TONE_CLASS  <- c(good = "text-bg-success", warn = "text-bg-warning",
                  bad = "text-bg-danger", neutral = "text-bg-secondary")
-CARD_HEIGHT <- 360
 
 # Info icon (ⓘ) with a popover. trigger = "focus" opens it on click and dismisses
 # it on outside-click (closing any other open one); the icon needs tabindex to be
@@ -70,7 +69,7 @@ badge_tag <- function(assessor, df) {
 tile_shell <- function(entry, ..., badge = entry$indicator_class %||% "",
                        badge_class = "text-bg-light", footer = source_label(entry)) {
   bslib::card(
-    height = CARD_HEIGHT, fillable = FALSE,
+    fillable = FALSE,   # natural height; layout_column_wrap(heights_equal = "row") aligns rows
     bslib::card_header(
       htmltools::strong(display_title(entry)),
       htmltools::span(class = "float-end",
@@ -147,16 +146,94 @@ spark_plot_modes <- function(df, frequency, tone = "neutral", ref = NA_real_, to
         hoverinfo = "skip", line = list(color = "#9e9e9e", width = 1, dash = "dash"))
     }
   }
-  p <- p |>
+  .static_sparkline(p)
+}
+
+# Shared look of the mini-charts.
+.sparkline_layout <- function(p) {
+  p |>
     plotly::layout(showlegend = FALSE, margin = list(l = 40, r = 5, t = 5, b = 20),
                    xaxis = list(title = "", showgrid = FALSE),
                    yaxis = list(title = "", zeroline = FALSE)) |>
     plotly::config(displayModeBar = FALSE, responsive = TRUE)
+}
 
-  # Serialise only the built traces: by default plotly also embeds the raw inputs
-  # (attrs) and rebuilds on render, roughly doubling the page size.
-  p <- plotly::plotly_build(p)
+# Static build: serialise only the built traces. By default plotly also embeds the raw
+# inputs (attrs) and rebuilds on render, roughly doubling the page size.
+.static_sparkline <- function(p) {
+  p <- plotly::plotly_build(.sparkline_layout(p))
   p$x[c("attrs", "visdat", "cur_data")] <- NULL
   p$preRenderHook <- NULL
   p
+}
+
+# --- two-line tiles (stocks vs bonds) -------------------------------------------
+# The data of a pair tile carries its two components (`equity`, `bond`) next to
+# `value`, the gap between them. In level mode the chart shows both lines and shades
+# any stretch where stocks yield less than bonds; z / pct modes show the gap.
+
+PAIR_COLOUR <- c(equity = "#2a78d6", bond = "#eb6834", crossed = "rgba(227,73,72,0.25)")
+
+# Key for the lines on show, with latest values: both components in level mode
+# ("Stocks 3.37% (Q2 2026)  Bonds 2.92%"), the gap in z-score / percentile modes.
+pair_detail <- function(df, mode = "level", tone = "neutral") {
+  if (is.null(df) || !nrow(df)) return(NULL)
+  last <- df[nrow(df), ]
+  key  <- function(colour) htmltools::span(style = sprintf(
+    "display:inline-block;width:14px;vertical-align:middle;margin-right:4px;border-top:2px solid %s;",
+    colour))
+  if (!identical(mode, "level")) {
+    return(htmltools::span(class = "d-block text-muted", key(unname(TONE_COLOUR[[tone]])),
+                           sprintf("Gap: stocks %.2f%% − bonds %.2f%%", last$equity, last$bond)))
+  }
+  quarter <- sprintf("Q%d %s", (as.integer(format(last$equity_asof, "%m")) - 1) %/% 3 + 1,
+                     format(last$equity_asof, "%Y"))
+  htmltools::span(class = "d-block text-muted",     # sits inside the tile's change line
+    key(PAIR_COLOUR[["equity"]]), sprintf("Stocks %.2f%% (%s)", last$equity, quarter),
+    htmltools::span(class = "ms-2"),
+    key(PAIR_COLOUR[["bond"]]), sprintf("Bonds %.2f%%", last$bond))
+}
+
+.add_pair_traces <- function(p, d, visible = TRUE) {
+  p |>
+    plotly::add_trace(x = d$date, y = d$bond, type = "scatter", mode = "lines", name = "level",
+      visible = visible, line = list(color = PAIR_COLOUR[["bond"]], width = 1.6),
+      hovertemplate = "%{x|%Y-%m-%d}<br>Bonds %{y:.2f}%<extra></extra>") |>
+    plotly::add_trace(x = d$date, y = pmin(d$equity, d$bond), type = "scatter", mode = "lines",
+      name = "level", visible = visible, fill = "tonexty", fillcolor = PAIR_COLOUR[["crossed"]],
+      line = list(width = 0), hoverinfo = "skip") |>
+    plotly::add_trace(x = d$date, y = d$equity, type = "scatter", mode = "lines", name = "level",
+      visible = visible, line = list(color = PAIR_COLOUR[["equity"]], width = 1.6),
+      hovertemplate = "%{x|%Y-%m-%d}<br>Stocks %{y:.2f}%<extra></extra>")
+}
+
+# Mini-chart of a pair tile for the Shiny app, in the chosen display mode.
+spark_plot_pair <- function(df, mode, tone = "neutral") {
+  if (!identical(mode, "level")) {
+    return(spark_plot(apply_mode(df, mode), "daily", tone, mode_ref(mode, NA_real_)))
+  }
+  .sparkline_layout(.add_pair_traces(plotly::plot_ly(height = 150), df))
+}
+
+# Mini-chart of a pair tile for the static build: both lines for level mode, the gap's
+# z-score and percentile for the other modes (toggled by the page JavaScript).
+spark_plot_pair_modes <- function(df, tone = "neutral") {
+  thin <- function(d) {      # last point of each ISO week, 4 significant digits
+    if (nrow(d) > 600) d <- d[!duplicated(format(d$date, "%G-%V"), fromLast = TRUE), ]
+    for (col in intersect(c("value", "equity", "bond"), names(d))) d[[col]] <- signif(d[[col]], 4)
+    d
+  }
+  p <- .add_pair_traces(plotly::plot_ly(height = 150), thin(df))
+  for (m in c("z", "pct")) {
+    g  <- thin(apply_mode(df, m))
+    rl <- mode_ref(m, NA_real_)
+    p <- p |>
+      plotly::add_trace(x = g$date, y = g$value, type = "scatter", mode = "lines", name = m,
+        visible = FALSE, line = list(color = unname(TONE_COLOUR[[tone]]), width = 1.6),
+        hovertemplate = "%{x|%Y-%m-%d}<br>%{y:.4~g}<extra></extra>") |>
+      plotly::add_trace(x = range(g$date), y = c(rl, rl), type = "scatter", mode = "lines",
+        name = paste0(m, "_ref"), visible = FALSE, hoverinfo = "skip",
+        line = list(color = "#9e9e9e", width = 1, dash = "dash"))
+  }
+  .static_sparkline(p)
 }

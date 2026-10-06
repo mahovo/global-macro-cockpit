@@ -58,6 +58,40 @@ ENTRY_OVERRIDES <- list(
         dplyr::arrange(date)
     }
   ),
+  # Stocks vs bonds, expected real returns: the earnings yield of US nonfinancial
+  # corporations (after-tax profits / market value of their equity; quarterly, dated at
+  # quarter end and carried forward to each trading day) against the expected real yield
+  # on 10-year Treasuries: the nominal yield minus the Cleveland Fed's 10-year expected
+  # inflation (monthly, carried forward). One measure for the whole history: TIPS yields
+  # start only in 2003 and carried a large liquidity premium in their early years.
+  # `value` is the gap in percentage points; `equity`, `bond` and `equity_asof` feed the
+  # two-line tile (spark_plot_pair* in R/tiles.R).
+  stocks_vs_bonds_real = list(
+    access = "transform",
+    fetch  = function(start, end, ttl) {
+      qend <- function(d) {                              # quarter start -> quarter end
+        m <- as.integer(format(d, "%m")) + 3
+        y <- as.integer(format(d, "%Y")) + (m > 12)
+        as.Date(sprintf("%d-%02d-01", y, ifelse(m > 12, m - 12, m))) - 1
+      }
+      prof <- fred_series("NFCPATAX",    as.Date(start) - 200, end, ttl = ttl)   # $bn, SAAR
+      eq   <- fred_series("NCBEILQ027S", as.Date(start) - 200, end, ttl = ttl)   # $m
+      nom  <- fred_series("DGS10",       start,                end, ttl = ttl)   # %, daily
+      inf  <- fred_series("EXPINF10YR",  as.Date(start) - 40,  end, ttl = ttl)   # %, monthly
+      j    <- findInterval(nom$date, inf$date)           # latest monthly estimate by each day
+      bond <- tibble::tibble(date = nom$date[j > 0], value = nom$value[j > 0] - inf$value[j[j > 0]])
+      ey <- dplyr::inner_join(prof, eq, by = "date", suffix = c("_p", "_e")) |>
+        dplyr::transmute(date = qend(date), ey = 100 * value_p * 1000 / value_e) |>
+        dplyr::arrange(date)
+      i  <- findInterval(bond$date, ey$date)             # latest quarter ended by each day
+      ok <- i > 0
+      tibble::tibble(date = bond$date[ok], equity = ey$ey[i[ok]], bond = bond$value[ok],
+                     equity_asof = ey$date[i[ok]]) |>
+        dplyr::mutate(value = equity - bond) |>
+        dplyr::filter(!is.na(value), date >= as.Date(start)) |>
+        dplyr::arrange(date)
+    }
+  ),
   # Buffett indicator: the registry's Wilshire id (WILL5000PRFC) 404s on the
   # keyless endpoint. Use the Z.1 corporate-equity market value (NCBEILQ027S,
   # $M) over GDP ($B) — the cleaner flow-of-funds version of the same gauge.
@@ -75,9 +109,10 @@ ENTRY_OVERRIDES <- list(
 )
 
 #' Normalize a (date, value) frame to the tidy-long shape, tagged from the entry.
+#' Extra columns (the two components of a two-line tile) are kept.
 .tidy_long <- function(df, entry) {
   if (is.null(df) || !nrow(df)) return(NULL)
-  tibble::tibble(
+  out <- tibble::tibble(
     date            = df$date,
     series_id       = entry$id,
     value           = df$value,
@@ -88,6 +123,8 @@ ENTRY_OVERRIDES <- list(
     units           = entry$units %||% NA_character_,
     fetched_at      = Sys.time()
   )
+  for (col in setdiff(names(df), c("date", "value"))) out[[col]] <- df[[col]]
+  out
 }
 
 #' Fetch one registry entry. `meta` supplies the frequency-based cache TTL.

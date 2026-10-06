@@ -93,6 +93,12 @@ series:
       - { label: "US IPO market stats (Renaissance Capital)", url: "https://www.renaissancecapital.com/IPO-Center/Stats" }
       - { label: "SPAC market stats (SPACInsider)", url: "https://www.spacinsider.com/data/stats" }
 
+  # ---- Bubbles: stocks vs bonds, expected real returns (after Ray Dalio). The earnings
+  #      yield of US nonfinancial corporations against the expected real yield on 10-year
+  #      Treasuries (nominal yield minus the Cleveland Fed's expected inflation); the tile
+  #      plots both lines and its value is the gap (computed in R/fetch.R). ----
+  - { id: stocks_vs_bonds_real, after: buffett_indicator, provider: transform, inputs: [NFCPATAX, NCBEILQ027S, DGS10, EXPINF10YR], chart: pair, theme: bubbles, indicator_class: leading, frequency: daily }
+
 # Manifest tiles removed from the dashboard. The global PMI is licensed, and the OECD G20
 # leading indicator (oecd_cli) already covers the global cycle.
 retired:

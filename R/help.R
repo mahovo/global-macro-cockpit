@@ -90,6 +90,7 @@ CARD_HELP <- list(
   epu_global = "Global Economic Policy Uncertainty (monthly). A broad gauge of worldwide policy risk; sustained highs weigh on investment and growth.",
   # --- bubbles ---
   buffett_indicator = "Corporate equity value ÷ GDP (the Z.1 'Buffett indicator') — how richly the whole market is valued vs the economy. ~1.0 historically normal; ~2.0+ is very stretched. Read as low margin of safety, not crash timing.",
+  stocks_vs_bonds_real = "Expected real returns, stocks vs bonds (after Ray Dalio). Stocks: the earnings yield of US nonfinancial corporations — after-tax profits over the market value of their shares, the real return priced into stocks in steady state. Bonds: the expected real yield on 10-year Treasuries, the nominal yield minus the Cleveland Fed's 10-year expected inflation. The value is the gap; near zero, stocks pay no extra expected return for their risk (the lines last crossed in 1999–2002). Earnings are quarterly and lag about three months.",
   real_10y_yield = "10-year TIPS (real) yield — the inflation-adjusted cost of money and the 'cheap-money fuel' gauge. Deeply negative real yields inflate valuations; rising real yields deflate them.",
   ipo_spac_issuance = "IPO & SPAC issuance — speculative supply that floods in at manias and dries up in busts. No free, republishable data; the tile links to public trackers.",
   case_shiller_price_rent = "Home price-to-rent ratio — housing's valuation gauge (a P/E for houses). Far above its history = stretched and rate-sensitive; same 'margin of safety' read as equity valuation.",

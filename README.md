@@ -31,6 +31,9 @@ indicator.
   and Brazil — government bond yields, short rates, OECD leading indicators, HICP/CPI
   and unemployment.
 - **Recession-watch snapshot** in the sidebar.
+- **Stocks vs bonds**: expected real returns on equities (the earnings yield) against the
+  expected real yield on 10-year Treasuries, after Ray Dalio — the tile warns when the two
+  lines near crossing.
 
 ## Two editions
 

@@ -60,7 +60,8 @@ data_tile <- function(entry) {
     div(class = "d-flex justify-content-between align-items-baseline",
       div(class = "fs-4 fw-semibold", textOutput(paste0("val_", id), inline = TRUE)),
       div(class = "small text-muted text-nowrap ms-2", uiOutput(paste0("asof_", id), inline = TRUE))),
-    div(class = "small mb-1", uiOutput(paste0("chg_", id), inline = TRUE)),
+    div(class = "small mb-1", uiOutput(paste0("chg_", id), inline = TRUE),
+        if (identical(entry$chart, "pair")) uiOutput(paste0("detail_", id))),
     uiOutput(paste0("badge_", id)),
     plotlyOutput(paste0("spark_", id), height = "150px", fill = FALSE)
   )
@@ -158,13 +159,18 @@ server <- function(input, output, session) {
     output[[paste0("asof_", id)]]  <- renderUI(asof_tag(dr(), ent$frequency))
     output[[paste0("chg_", id)]]   <- renderUI(change_tag(dr(), input$view_mode))
     output[[paste0("badge_", id)]] <- renderUI(badge_tag(ass, dr()))   # reads the level
+    if (identical(ent$chart, "pair")) output[[paste0("detail_", id)]] <- renderUI({
+      raw <- dr()
+      pair_detail(raw, input$view_mode, if (!is.null(ass) && !is.null(raw)) ass(raw)$tone else "neutral")
+    })
 
     output[[paste0("spark_", id)]] <- renderPlotly({
       raw <- dr()
       validate(need(!is.null(raw) && nrow(raw) > 0, "No data — click Refresh."))
       tone <- if (!is.null(ass)) ass(raw)$tone else "neutral"
-      spark_plot(apply_mode(raw, input$view_mode), ent$frequency, tone,
-                 mode_ref(input$view_mode, ref))
+      if (identical(ent$chart, "pair")) spark_plot_pair(raw, input$view_mode, tone)
+      else spark_plot(apply_mode(raw, input$view_mode), ent$frequency, tone,
+                      mode_ref(input$view_mode, ref))
     })
   })
 

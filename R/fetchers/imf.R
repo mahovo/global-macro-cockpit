@@ -15,7 +15,7 @@ imf_series <- function(flow, key, start = NULL, end = NULL, ttl = 24 * 3600) {
     raw <- httr2::request(url) |>
       httr2::req_headers(Accept = "application/vnd.sdmx.data+csv;version=1.0.0") |>
       httr2::req_timeout(30) |>
-      httr2::req_retry(max_tries = 3) |>
+      httr2::req_retry(max_tries = 3, retry_on_failure = TRUE) |>   # also retry timeouts
       httr2::req_perform() |>
       httr2::resp_body_string()
     sdmx_csv_values(raw, "imf")

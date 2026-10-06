@@ -22,18 +22,22 @@ load_registry <- function(path = registry_path()) {
 }
 
 #' Merge curated series into the manifest's. An entry with `replaces: <id>` takes the
-#' place of that manifest series (same tab, same position); other entries are appended.
-#' Ids listed under `retired` are dropped.
+#' place of that manifest series (same tab, same position); one with `after: <id>` is
+#' inserted right after it; other entries are appended. Ids under `retired` are dropped.
 merge_curated <- function(series, curated = NULL, retired = NULL) {
   ids <- vapply(series, function(e) e$id %||% "", "")
   for (e in curated) {
-    at <- if (is.null(e$replaces)) integer(0) else which(ids == e$replaces)
-    if (!is.null(e$replaces) && !length(at)) {
-      warning(sprintf("sources_global.yaml: '%s' replaces unknown id '%s'", e$id, e$replaces), call. = FALSE)
+    anchor <- e$replaces %||% e$after
+    at <- if (is.null(anchor)) integer(0) else which(ids == anchor)
+    if (!is.null(anchor) && !length(at)) {
+      warning(sprintf("sources_global.yaml: '%s' refers to unknown id '%s'", e$id, anchor), call. = FALSE)
     }
-    if (length(at)) {
+    if (length(at) && !is.null(e$replaces)) {
       for (i in at) series[[i]] <- e
       ids[at] <- e$id
+    } else if (length(at)) {
+      series <- append(series, list(e), after = at[1])
+      ids    <- append(ids, e$id, after = at[1])
     } else {
       series[[length(series) + 1]] <- e
       ids <- c(ids, e$id)

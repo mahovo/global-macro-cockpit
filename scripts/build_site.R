@@ -95,13 +95,16 @@ data_card <- function(e, df) {
   ass  <- assess_for(e$id)
   tone <- if (is.null(ass)) "neutral" else ass(df)$tone
   unit <- display_unit(e)
+  pair <- identical(e$chart, "pair")   # two-line tile, e.g. stocks vs bonds
   tile_shell(e, footer = attribution_tag(e, LIC),
     div(class = "d-flex justify-content-between align-items-baseline",
       div(class = "fs-4 fw-semibold", mode_parts(function(m) value_label(df, m, unit))),
       div(class = "small text-muted text-nowrap ms-2", asof_tag(df, e$frequency))),
-    div(class = "small mb-1", mode_parts(function(m) change_tag(df, m))),
+    div(class = "small mb-1", mode_parts(function(m) change_tag(df, m)),
+        if (pair) mode_parts(function(m) pair_detail(df, m, tone))),
     badge_tag(ass, df),
-    spark_plot_modes(df, e$frequency, tone, display_ref(e), TODAY)
+    if (pair) spark_plot_pair_modes(df, tone)
+    else spark_plot_modes(df, e$frequency, tone, display_ref(e), TODAY)
   )
 }
 
