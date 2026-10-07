@@ -125,9 +125,9 @@ assess_stocks_bonds <- function(df) {   # earnings yield minus real 10Y yield, p
   else              list(text = "Stocks out-yield bonds", tone = "good")
 }
 
-# Euro-area stocks vs bonds: its level isn't comparable with the US tile's, so it is read
-# against its own history (`gap_rank`, `hist_from`: see R/fetch.R); only a negative gap is
-# read absolutely.
+# Euro-area and UK stocks vs bonds: their levels aren't comparable with the US tile's, so
+# each is read against its own history (`gap_rank`, `hist_from`: see R/fetch.R); only a
+# negative gap is read absolutely.
 assess_stocks_bonds_history <- function(df) {
   v <- .last(df)
   if (is.na(v)) return(list(text = "No data", tone = "neutral"))
@@ -185,7 +185,7 @@ ASSESSORS <- list(
   cpi_uk = assess_cpi, cpi_japan = assess_cpi, cpi_china = assess_cpi, cpi_india = assess_cpi,
   # free replacements for licensed manual tiles
   cli_usa = assess_cli, gscpi = assess_gscpi, stocks_vs_bonds_real = assess_stocks_bonds,
-  stocks_vs_bonds_euro_area = assess_stocks_bonds_history,
+  stocks_vs_bonds_euro_area = assess_stocks_bonds_history, stocks_vs_bonds_uk = assess_stocks_bonds_history,
   growth_inflation_regime = assess_regime, regime_euro_area = assess_regime,
   regime_uk = assess_regime, regime_japan = assess_regime, regime_china = assess_regime
 )

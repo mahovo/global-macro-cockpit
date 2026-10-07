@@ -232,6 +232,14 @@ side <- sidebar(
 # --- footer: about, attributions, notices ---------------------------------------
 published    <- names(DATA)[!vapply(DATA, is.null, logical(1))]
 attributions <- sort(unique(stats::na.omit(LIC$attribution[LIC$id %in% published])))
+
+# Does a published series come from `provider`, directly or as an input of a derived
+# series (a source id starting with `prefix`)?
+uses <- function(provider, prefix) {
+  rows <- LIC$id %in% published
+  ids  <- trimws(unlist(strsplit(stats::na.omit(LIC$source_ids[rows]), ";", fixed = TRUE)))
+  provider %in% LIC$provider[rows] || any(startsWith(ids, prefix))
+}
 IMF_TERMS    <- "https://www.imf.org/en/about/copyright-and-terms"
 
 # A credit links to its source page when every series sharing it has the same one.
@@ -267,10 +275,10 @@ footer <- div(class = "about-data small text-muted mt-5 pt-3 border-top",
     "this site. Licensed indicators (S&P 500, ICE BofA credit spreads, S&P Cotality ",
     "Case-Shiller) and headline-only surveys are linked rather than republished."),
   # Statements some providers ask for, shown when their data are on the page.
-  if ("boe" %in% LIC$provider[LIC$id %in% published])
-    p("SONIA data licensed under the Open Government Licence v3.0 and copyright the Governor ",
-      "and Company of the Bank of England."),
-  if ("ons" %in% LIC$provider[LIC$id %in% published])
+  if (uses("boe", "BoE/"))
+    p("Bank of England data (SONIA and gilt yields) licensed under the Open Government ",
+      "Licence v3.0 and copyright the Governor and Company of the Bank of England."),
+  if (uses("ons", "ONS/"))
     p("Source: Office for National Statistics licensed under the Open Government Licence v.3.0."),
   if ("boj" %in% LIC$provider[LIC$id %in% published])
     p('This service uses the API provided by the "Bank of Japan Time-Series Data Search." ',

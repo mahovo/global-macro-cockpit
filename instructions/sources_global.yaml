@@ -103,6 +103,9 @@ series:
   #      government yield minus the long-term inflation expectation of the ECB's Survey of
   #      Professional Forecasters (computed in R/fetch.R). ----
   - { id: stocks_vs_bonds_euro_area, after: stocks_vs_bonds_real, provider: transform, inputs: ["ECB/QSA/B4N", "ECB/QSA/D5", "ECB/QSA/F51", "ECB/YC/SR_10Y", "ECB/SPF/HICP.LT"], chart: pair, theme: bubbles, indicator_class: leading, frequency: daily }
+  #      The UK version, from ONS sector accounts (private non-financial corporations) and
+  #      the Bank of England's 10-year real gilt yield (computed in R/fetch.R).
+  - { id: stocks_vs_bonds_uk, after: stocks_vs_bonds_euro_area, provider: transform, inputs: ["ONS/UKEA/RPBO", "ONS/UKEA/ROCH", "ONS/UKEA/ROCI", "ONS/UKEA/RPLA", "ONS/PROF/LRWL", "ONS/PROF/LRWM", "ONS/UKEA/NLBZ", "ONS/UKEA/NLCA", "ONS/UKEA/NLCB", "BoE/IUDMRZC"], chart: pair, theme: bubbles, indicator_class: leading, frequency: daily }
 
   # ---- Cycle: growth/inflation regime (after Ray Dalio's four environments), the first
   #      tile of Cycle & Growth. Growth momentum is the 3-month change in the OECD CLI for
