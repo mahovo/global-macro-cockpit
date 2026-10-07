@@ -40,6 +40,7 @@ cat(sprintf("Checking %d FRED-sourced rows against the FRED API...\n\n", nrow(fr
 report <- do.call(rbind, lapply(seq_len(nrow(fred_rows)), function(i) {
   r <- fred_rows[i, ]
   ids <- trimws(strsplit(r$source_ids, ";", fixed = TRUE)[[1]])
+  ids <- ids[!grepl(":", ids, fixed = TRUE)]     # other providers' inputs, e.g. OECD's DF_CLI:USA
   classes <- vapply(ids, fred_copyright_class, character(1))
   data.frame(id = r$id, source_ids = r$source_ids, table = r$licence_class,
              fred = classes[which.max(RANK[classes])], stringsAsFactors = FALSE)
@@ -49,7 +50,11 @@ if (all(report$fred == "unknown")) {
   cat("FRED's API returned no copyright tags for these series, so this check can't be\n",
       "automated here. Review https://fred.stlouisfed.org/series/<ID> pages manually.\n", sep = "")
 } else {
-  diffs <- report[report$table != report$fred, , drop = FALSE]
+  # A row that also uses another provider's data carries that licence (cc-by-4.0 for OECD
+  # inputs): flag it only when its FRED inputs need more than attribution.
+  mixed <- !(report$table %in% names(RANK))
+  flag  <- ifelse(mixed, RANK[report$fred] > RANK[["citation-required"]], report$table != report$fred)
+  diffs <- report[flag, , drop = FALSE]
   if (nrow(diffs)) {
     cat("Rows where FRED's current status differs from the table (review these):\n")
     print(diffs, row.names = FALSE)

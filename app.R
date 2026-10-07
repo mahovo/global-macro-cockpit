@@ -54,8 +54,14 @@ DATA_ENTRIES  <- Filter(function(e) status_of(e$id) == "ok",     .all_series)
 DATA_IDS      <- vapply(DATA_ENTRIES, function(e) e$id, "")
 
 # --- tile UI (card chrome, popovers and charts live in R/tiles.R) ------------
+is_regime <- function(entry) identical(entry$chart, "regime")
+
 data_tile <- function(entry) {
   id <- entry$id
+  # The growth/inflation regime tile is one block (regime_body() in R/tiles.R).
+  if (is_regime(entry)) {
+    return(tile_shell(entry, footer = attribution_tag(entry, LIC), uiOutput(paste0("body_", id))))
+  }
   tile_shell(entry, footer = attribution_tag(entry, LIC),
     div(class = "d-flex justify-content-between align-items-baseline",
       div(class = "fs-4 fw-semibold", textOutput(paste0("val_", id), inline = TRUE)),
@@ -150,8 +156,18 @@ server <- function(input, output, session) {
   })
   names(data_r) <- DATA_IDS
 
-  # Wire the five outputs for each data tile.
-  for (e in DATA_ENTRIES) local({
+  # The regime tile renders as one block and looks the same in every display mode.
+  for (e in Filter(is_regime, DATA_ENTRIES)) local({
+    ent <- e; dr <- data_r[[ent$id]]
+    output[[paste0("body_", ent$id)]] <- renderUI({
+      raw <- dr()
+      validate(need(!is.null(raw) && nrow(raw) > 0, "No data — click Refresh."))
+      regime_body(raw, ent$frequency)
+    })
+  })
+
+  # Wire the five outputs for each other data tile.
+  for (e in Filter(Negate(is_regime), DATA_ENTRIES)) local({
     ent <- e; id <- ent$id; dr <- data_r[[id]]
     ass <- assess_for(id); ref <- display_ref(ent); unit <- display_unit(ent)
 

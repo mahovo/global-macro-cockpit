@@ -92,6 +92,8 @@ mode_parts <- function(fun) {
 }
 
 data_card <- function(e, df) {
+  if (identical(e$chart, "regime"))    # one block, the same in every display mode
+    return(tile_shell(e, footer = attribution_tag(e, LIC), regime_body(df, e$frequency, static = TRUE)))
   ass  <- assess_for(e$id)
   tone <- if (is.null(ass)) "neutral" else ass(df)$tone
   unit <- display_unit(e)
@@ -245,9 +247,9 @@ footer <- div(class = "about-data small text-muted mt-5 pt-3 border-top",
   p("Each tile credits its source. Sources republished on this page:"),
   tags$ul(class = "mb-2", lapply(attributions, source_item)),
   p("Z-scores, percentiles, changes versus the prior observation and series derived from ",
-    "several inputs (such as net liquidity and the equity/GDP ratio) are computed by this ",
-    "site from the original series. They are adaptations of the original works and are not ",
-    "endorsed by the source organisations."),
+    "several inputs (such as net liquidity, the equity/GDP ratio and the growth/inflation ",
+    "regime) are computed by this site from the original series. They are adaptations of ",
+    "the original works and are not endorsed by the source organisations."),
   p("This is an adaptation of an original work by the OECD. The opinions expressed and ",
     "arguments employed in this adaptation should not be reported as representing the ",
     "official views of the OECD or of its Member countries."),
@@ -297,9 +299,12 @@ body[data-mode='pct'] .mode-part[data-mode='pct'] { display: inline; }
 
 # Display-mode and zoom controls: toggle which precomputed traces are visible
 # (level / z / pct), set the x range, and fit the y range to what's in view.
+# Traces with other names (the regime tile's) keep their visibility, and charts
+# without a date axis (the regime quadrant) are not zoomed.
 # Plots rendered inside hidden tabs are resized when their tab is shown.
 JS <- "
 (function () {
+  var MODE_TRACE = /^(level|z|pct)(_ref)?$/;
   function plots() { return Array.prototype.slice.call(document.querySelectorAll('.js-plotly-plot')); }
   function checked(name, fallback) {
     var el = document.querySelector('input[name=\"' + name + '\"]:checked');
@@ -308,7 +313,7 @@ JS <- "
   function yRange(gd, x0, x1) {
     var lo = Infinity, hi = -Infinity;
     gd.data.forEach(function (t) {
-      if (t.visible !== true || !t.x || !t.y) return;
+      if (t.visible !== true || !t.x || !t.y || !MODE_TRACE.test(t.name || '')) return;
       var isRef = /_ref$/.test(t.name || '');
       for (var i = 0; i < t.y.length; i++) {
         var y = t.y[i];
@@ -324,8 +329,13 @@ JS <- "
   }
   function applyTo(gd, mode, x0, x1) {
     if (!gd.data) return false;
-    var vis = gd.data.map(function (t) { return t.name === mode || t.name === mode + '_ref'; });
+    var vis = gd.data.map(function (t) {
+      var n = t.name || '';
+      return MODE_TRACE.test(n) ? (n === mode || n === mode + '_ref') : t.visible !== false;
+    });
     Plotly.restyle(gd, { visible: vis }).then(function () {
+      var fl = gd._fullLayout;
+      if (!fl || !fl.xaxis || fl.xaxis.type !== 'date') return;
       var upd = { 'xaxis.range': [x0, x1] };
       var yr = yRange(gd, x0, x1);
       if (yr) upd['yaxis.range'] = yr;

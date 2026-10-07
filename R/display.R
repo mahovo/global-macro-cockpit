@@ -56,7 +56,8 @@ TITLE_OVERRIDES <- list(
   cli_usa = "OECD CLI — US", gscpi = "Global supply chain pressure (NY Fed)",
   new_home_sales = "New home sales", mortgage_rate_30y = "30Y mortgage rate",
   ipo_spac_issuance = "IPO & SPAC issuance",
-  stocks_vs_bonds_real = "Stocks vs bonds (real)"
+  stocks_vs_bonds_real = "Stocks vs bonds (real)",
+  growth_inflation_regime = "Growth & inflation regime"
 )
 
 # Reference lines drawn on the mini-chart, where a meaningful threshold exists.

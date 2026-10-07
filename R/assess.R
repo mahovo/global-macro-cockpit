@@ -125,6 +125,23 @@ assess_stocks_bonds <- function(df) {   # earnings yield minus real 10Y yield, p
   else              list(text = "Stocks out-yield bonds", tone = "good")
 }
 
+# Growth/inflation regimes (after Ray Dalio's four environments), indexed by the code
+# the fetch layer stores in `value` (R/fetch.R).
+REGIMES <- data.frame(
+  code      = 1:4,
+  name      = c("Goldilocks", "Reflation", "Stagflation", "Disinflationary slowdown"),
+  growth    = c(TRUE, TRUE, FALSE, FALSE),    # growth rising?
+  inflation = c(FALSE, TRUE, TRUE, FALSE),    # inflation rising?
+  tone      = c("good", "warn", "bad", "warn"),
+  stringsAsFactors = FALSE
+)
+
+assess_regime <- function(df) {
+  v <- .last(df)
+  if (is.na(v)) list(text = "No data", tone = "neutral")
+  else          list(text = REGIMES$name[v], tone = REGIMES$tone[v])
+}
+
 assess_gscpi <- function(df) {          # standard deviations from the historical average
   v <- .last(df)
   if (is.na(v))      list(text = "No data", tone = "neutral")
@@ -152,7 +169,8 @@ ASSESSORS <- list(
   # global (G2)
   cpi_uk = assess_cpi, cpi_japan = assess_cpi, cpi_china = assess_cpi, cpi_india = assess_cpi,
   # free replacements for licensed manual tiles
-  cli_usa = assess_cli, gscpi = assess_gscpi, stocks_vs_bonds_real = assess_stocks_bonds
+  cli_usa = assess_cli, gscpi = assess_gscpi, stocks_vs_bonds_real = assess_stocks_bonds,
+  growth_inflation_regime = assess_regime
 )
 
 #' Assessor for a series id, or NULL.

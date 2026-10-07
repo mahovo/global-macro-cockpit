@@ -158,14 +158,24 @@ spark_plot_modes <- function(df, frequency, tone = "neutral", ref = NA_real_, to
     plotly::config(displayModeBar = FALSE, responsive = TRUE)
 }
 
+.static_sparkline <- function(p) .static_plot(.sparkline_layout(p))
+
 # Static build: serialise only the built traces. By default plotly also embeds the raw
 # inputs (attrs) and rebuilds on render, roughly doubling the page size.
-.static_sparkline <- function(p) {
-  p <- plotly::plotly_build(.sparkline_layout(p))
+.static_plot <- function(p) {
+  p <- plotly::plotly_build(p)
   p$x[c("attrs", "visdat", "cur_data")] <- NULL
   p$preRenderHook <- NULL
   p
 }
+
+# Legend glyphs drawn beside text: a short line and a dot.
+.key_line <- function(colour) htmltools::span(style = sprintf(
+  "display:inline-block;width:14px;vertical-align:middle;margin-right:4px;border-top:2px solid %s;",
+  colour))
+.key_dot <- function(colour) htmltools::span(style = sprintf(
+  "display:inline-block;width:8px;height:8px;border-radius:50%%;vertical-align:middle;margin-right:4px;background:%s;",
+  colour))
 
 # --- two-line tiles (stocks vs bonds) -------------------------------------------
 # The data of a pair tile carries its two components (`equity`, `bond`) next to
@@ -179,9 +189,7 @@ PAIR_COLOUR <- c(equity = "#2a78d6", bond = "#eb6834", crossed = "rgba(227,73,72
 pair_detail <- function(df, mode = "level", tone = "neutral") {
   if (is.null(df) || !nrow(df)) return(NULL)
   last <- df[nrow(df), ]
-  key  <- function(colour) htmltools::span(style = sprintf(
-    "display:inline-block;width:14px;vertical-align:middle;margin-right:4px;border-top:2px solid %s;",
-    colour))
+  key  <- .key_line
   if (!identical(mode, "level")) {
     return(htmltools::span(class = "d-block text-muted", key(unname(TONE_COLOUR[[tone]])),
                            sprintf("Gap: stocks %.2f%% − bonds %.2f%%", last$equity, last$bond)))
@@ -236,4 +244,135 @@ spark_plot_pair_modes <- function(df, tone = "neutral") {
         line = list(color = "#9e9e9e", width = 1, dash = "dash"))
   }
   .static_sparkline(p)
+}
+
+# --- growth/inflation regime tile -----------------------------------------------
+# The data carry `growth` (3-month change in the US CLI), `inflation` (CPI inflation
+# minus its 12-month average), `cli`, `cpi_yoy`, `cpi_avg12`, `since` and `before`
+# next to `value`, the regime code (REGIMES in R/assess.R). The tile looks the same in
+# every display mode: z-scores would move the zero lines that separate the regimes.
+
+# One colour per regime code. Any two regimes can sit side by side on the strip, so the
+# four were validated as a set against every pairing for colour-blind separation.
+REGIME_COLOUR <- c("#008300", "#eda100", "#e87ba4", "#2a78d6")
+REGIME_INK    <- "#52514e"     # the path, the latest month and their key
+.AXIS_FONT    <- list(size = 10, color = "#6c757d")
+
+.rgba <- function(hex, alpha) {
+  v <- grDevices::col2rgb(hex)
+  sprintf("rgba(%d,%d,%d,%.2f)", v[1], v[2], v[3], alpha)
+}
+.month_label <- function(d) format(d, "%b %Y")
+.next_month  <- function(d) as.Date(format(d + 32, "%Y-%m-01"))   # d is a month start
+
+# "Growth ↑ Inflation ↓" for the latest month.
+regime_headline <- function(df) {
+  r <- REGIMES[df$value[nrow(df)], ]
+  arrow <- function(up) if (up) "↑" else "↓"
+  sprintf("Growth %s Inflation %s", arrow(r$growth), arrow(r$inflation))
+}
+
+# When the current regime began, the regime before it, and the two readings behind it.
+regime_detail <- function(df) {
+  last <- df[nrow(df), ]
+  htmltools::tagList(
+    htmltools::div(paste0("Since ", .month_label(last$since),
+                          if (!is.na(last$before)) paste0(", after ", REGIMES$name[last$before]))),
+    htmltools::div(class = "text-muted",
+      sprintf("Growth: CLI %.2f, %+.2f over 3 months", last$cli, last$growth)),
+    htmltools::div(class = "text-muted",
+      sprintf("Inflation: CPI %.2f%%, 12-month average %.2f%%", last$cpi_yoy, last$cpi_avg12)))
+}
+
+# Quadrant: growth momentum across, inflation momentum up, each regime's quadrant tinted
+# and named beside a swatch of its colour (the legend for the strip below), and the path
+# of the last `months` months ending in a larger dot.
+regime_quadrant <- function(df, months = 12) {
+  d  <- utils::tail(df, months)
+  n  <- nrow(d)
+  xr <- 1.3 * max(0.3, abs(d$growth))      # symmetric ranges keep the origin centred
+  yr <- 1.3 * max(0.3, abs(d$inflation))
+  sx <- ifelse(REGIMES$growth, 1, -1)
+  sy <- ifelse(REGIMES$inflation, 1, -1)
+  tints <- lapply(REGIMES$code, function(k) list(type = "rect", layer = "below",
+    x0 = 0, x1 = sx[k] * xr, y0 = 0, y1 = sy[k] * yr, line = list(width = 0),
+    fillcolor = .rgba(REGIME_COLOUR[k], 0.12)))
+  zero <- list(color = "#b5b4ad", width = 1)
+  lines <- list(
+    list(type = "line", layer = "below", x0 = 0, x1 = 0, y0 = -yr, y1 = yr, line = zero),
+    list(type = "line", layer = "below", x0 = -xr, x1 = xr, y0 = 0, y1 = 0, line = zero))
+  labels <- lapply(REGIMES$code, function(k) list(
+    x = sx[k] * xr, y = sy[k] * yr, xref = "x", yref = "y", showarrow = FALSE,
+    text = sprintf('<span style="color:%s;font-size:12px">■</span> %s', REGIME_COLOUR[k],
+                   gsub(" ", "<br>", REGIMES$name[k])), font = .AXIS_FONT,
+    align = if (sx[k] > 0) "right" else "left",
+    xanchor = if (sx[k] > 0) "right" else "left", yanchor = if (sy[k] > 0) "top" else "bottom",
+    xshift = -3 * sx[k], yshift = -2 * sy[k]))
+  hover <- sprintf("%s: %s<br>Growth %+.2f, inflation %+.2f pp", .month_label(d$date),
+                   REGIMES$name[d$value], d$growth, d$inflation)
+  plotly::plot_ly(height = 170) |>
+    plotly::add_trace(x = d$growth, y = d$inflation, type = "scatter", mode = "lines+markers",
+      name = "path", line = list(color = REGIME_INK, width = 2),
+      marker = list(size = 6, color = REGIME_INK), hovertext = hover, hoverinfo = "text") |>
+    plotly::add_trace(x = d$growth[n], y = d$inflation[n], type = "scatter", mode = "markers",
+      name = "latest", marker = list(size = 11, color = REGIME_INK, line = list(color = "#ffffff", width = 2)),
+      hovertext = hover[n], hoverinfo = "text") |>
+    plotly::layout(showlegend = FALSE, margin = list(l = 48, r = 5, t = 5, b = 34),
+      shapes = c(tints, lines), annotations = labels,
+      xaxis = list(range = c(-xr, xr), zeroline = FALSE, showgrid = FALSE, nticks = 5,
+                   tickfont = .AXIS_FONT, title = list(text = "CLI change over 3 months",
+                   font = .AXIS_FONT, standoff = 4)),
+      yaxis = list(range = c(-yr, yr), zeroline = FALSE, showgrid = FALSE, nticks = 5,
+                   tickfont = .AXIS_FONT, title = list(text = "CPI vs 12-mo avg, pp",
+                   font = .AXIS_FONT, standoff = 4))) |>
+    plotly::config(displayModeBar = FALSE, responsive = TRUE)
+}
+
+# Strip: one bar per spell of a regime across the data's window, on a date axis (the
+# static page's zoom sets its range). Hover gives each spell's full span.
+regime_strip <- function(df) {
+  run   <- cumsum(c(TRUE, diff(df$value) != 0))
+  first <- !duplicated(run)
+  last  <- !duplicated(run, fromLast = TRUE)
+  from  <- df$date[first]
+  to    <- .next_month(df$date[last])
+  code  <- df$value[first]
+  began <- df$since[first]                # a spell can start before the window
+  n_mo  <- (as.integer(format(df$date[last], "%Y")) - as.integer(format(began, "%Y"))) * 12 +
+           as.integer(format(df$date[last], "%m")) - as.integer(format(began, "%m")) + 1
+  hover <- sprintf("%s<br>%s – %s (%d month%s)", REGIMES$name[code], .month_label(began),
+                   .month_label(df$date[last]), n_mo, ifelse(n_mo == 1, "", "s"))
+  plotly::plot_ly(height = 46) |>
+    plotly::add_trace(type = "bar", orientation = "h", y = rep(0, length(from)),
+      x = as.numeric(to - from) * 86400000, base = format(from), name = "regime",
+      marker = list(color = REGIME_COLOUR[code], line = list(color = "#ffffff", width = 1)),
+      hovertext = hover, hoverinfo = "text") |>
+    plotly::layout(showlegend = FALSE, bargap = 0, margin = list(l = 48, r = 5, t = 2, b = 20),
+      xaxis = list(type = "date", showgrid = FALSE, tickfont = .AXIS_FONT, title = ""),
+      yaxis = list(visible = FALSE, range = c(-0.5, 0.5), fixedrange = TRUE)) |>
+    plotly::config(displayModeBar = FALSE, responsive = TRUE)
+}
+
+# Key for the quadrant's path (the quadrant labels carry the regime colours).
+regime_key <- function(df) {
+  htmltools::div(class = "small text-muted mt-1",
+    .key_line(REGIME_INK), "Last 12 months", htmltools::span(class = "ms-2"),
+    .key_dot(REGIME_INK), .month_label(df$date[nrow(df)]))
+}
+
+# The whole tile body, shared by the app (renderUI) and the static build (static = TRUE
+# strips plotly's raw inputs from the page).
+regime_body <- function(df, frequency, static = FALSE) {
+  fin <- if (static) .static_plot else identity
+  htmltools::tagList(
+    # One line of words, a step smaller than the other tiles' figures; on a narrow card
+    # the date moves below the headline rather than splitting it.
+    htmltools::div(class = "d-flex flex-wrap justify-content-between align-items-baseline",
+      htmltools::div(class = "fs-5 fw-semibold text-nowrap me-2", regime_headline(df)),
+      htmltools::div(class = "small text-muted text-nowrap", asof_tag(df, frequency))),
+    htmltools::div(class = "small mb-1", regime_detail(df)),
+    badge_tag(assess_regime, df),
+    fin(regime_quadrant(df)),
+    fin(regime_strip(df)),
+    regime_key(df))
 }

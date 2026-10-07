@@ -99,6 +99,13 @@ series:
   #      plots both lines and its value is the gap (computed in R/fetch.R). ----
   - { id: stocks_vs_bonds_real, after: buffett_indicator, provider: transform, inputs: [NFCPATAX, NCBEILQ027S, DGS10, EXPINF10YR], chart: pair, theme: bubbles, indicator_class: leading, frequency: daily }
 
+  # ---- Cycle: growth/inflation regime (after Ray Dalio's four environments), the first
+  #      tile of Cycle & Growth. Growth momentum is the 3-month change in the OECD CLI for
+  #      the US; inflation momentum is headline CPI inflation minus its 12-month average
+  #      (computed in R/fetch.R). The tile plots the last 12 months on a quadrant and the
+  #      regime of each month on a strip below. ----
+  - { id: growth_inflation_regime, after: ppi_final_demand, provider: transform, inputs: ["DF_CLI:USA", CPIAUCSL], chart: regime, theme: cycle, indicator_class: leading, frequency: monthly }
+
 # Manifest tiles removed from the dashboard. The global PMI is licensed, and the OECD G20
 # leading indicator (oecd_cli) already covers the global cycle.
 retired:

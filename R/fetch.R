@@ -92,6 +92,46 @@ ENTRY_OVERRIDES <- list(
         dplyr::arrange(date)
     }
   ),
+  # Growth/inflation regime, after Ray Dalio's four economic environments. Growth
+  # momentum: the 3-month change in the OECD CLI for the US (index points). Inflation
+  # momentum: headline CPI inflation, year on year, minus its average over the past 12
+  # months (percentage points). Above zero counts as rising. `value` is the regime code:
+  # 1 growth up / inflation down (Goldilocks), 2 both up (Reflation), 3 growth down /
+  # inflation up (Stagflation), 4 both down (Disinflationary slowdown); names, tones and
+  # colours live in R/assess.R and R/tiles.R. `since` and `before` give the start of the
+  # current spell and the regime before it, worked out on the longer history fetched
+  # here. At least 12 months are returned, so the quadrant's path is always complete.
+  growth_inflation_regime = list(
+    access = "transform",
+    fetch  = function(start, end, ttl) {
+      from <- as.Date(start) - 5 * 366       # 23 months feed the first value; the rest finds spell starts
+      cli  <- oecd_cli("USA", from, end)
+      cpi  <- fred_series("CPIAUCSL", from, end, ttl = ttl)
+      # A month BLS never published (October 2025, during the federal shutdown) is filled
+      # in log-linearly from its neighbours before any rate is taken.
+      months <- seq(min(cpi$date), max(cpi$date), by = "month")
+      lvl  <- exp(stats::approx(cpi$date, log(cpi$value), xout = months)$y)
+      yoy  <- 100 * (lvl / dplyr::lag(lvl, 12) - 1)
+      avg  <- as.numeric(stats::filter(yoy, rep(1 / 12, 12), sides = 1))
+      cm   <- seq(min(cli$date), max(cli$date), by = "month")
+      lev  <- cli$value[match(cm, cli$date)]
+      d <- dplyr::inner_join(
+        tibble::tibble(date = cm, cli = lev, growth = lev - dplyr::lag(lev, 3)),
+        tibble::tibble(date = months, cpi_yoy = yoy, cpi_avg12 = avg, inflation = yoy - avg),
+        by = "date") |>
+        dplyr::filter(!is.na(growth), !is.na(inflation)) |>
+        dplyr::arrange(date) |>
+        dplyr::mutate(value = ifelse(growth > 0, ifelse(inflation > 0, 2, 1),
+                                     ifelse(inflation > 0, 3, 4)))
+      if (!nrow(d)) return(d)
+      spell    <- cumsum(c(TRUE, diff(d$value) != 0))
+      first    <- match(spell, spell)                    # first row of each row's spell
+      d$since  <- d$date[first]
+      d$before <- ifelse(first > 1, d$value[pmax(first - 1, 1)], NA)
+      keep <- min(as.Date(start), seq(max(d$date), by = "-11 months", length.out = 2)[2])
+      dplyr::filter(d, date >= keep)
+    }
+  ),
   # Buffett indicator: the registry's Wilshire id (WILL5000PRFC) 404s on the
   # keyless endpoint. Use the Z.1 corporate-equity market value (NCBEILQ027S,
   # $M) over GDP ($B) — the cleaner flow-of-funds version of the same gauge.
