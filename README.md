@@ -32,8 +32,9 @@ indicator.
   and unemployment.
 - **Recession-watch snapshot** in the sidebar.
 - **Stocks vs bonds**: expected real returns on equities (the earnings yield) against the
-  expected real yield on 10-year Treasuries, after Ray Dalio — the tile warns when the two
-  lines near crossing.
+  expected real yield on 10-year government bonds, after Ray Dalio, for the US (warning
+  when the two lines near crossing) and the euro area (from ECB sector accounts, read
+  against its own history).
 - **Growth & inflation regimes**: which of Dalio's four economic environments the US, the
   euro area, the UK, Japan and China are in (growth rising or falling, crossed with
   inflation rising or falling), from the OECD leading indicators and headline inflation:

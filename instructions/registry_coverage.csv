@@ -82,6 +82,7 @@
 "excess_cape_yield","transform","transform",NA,"bubbles","monthly","pending:transform",NA,NA,"pending: transform formula needs non-FRED inputs"
 "buffett_indicator","transform","transform",NA,"bubbles","monthly","ok",4,"2026-04-01",""
 "stocks_vs_bonds_real","transform","transform",NA,"bubbles","daily","ok",341,"2026-10-05",""
+"stocks_vs_bonds_euro_area","transform","transform",NA,"bubbles","daily","ok",351,"2026-10-06",""
 "tobins_q","transform","transform",NA,"bubbles","quarterly","pending:transform",NA,NA,"pending: transform inputs are not FRED ids (needs another provider)"
 "finra_margin_debt","finra","csv","/investors/margin-statistics","bubbles","monthly","pending:csv",NA,NA,"pending: finra csv fetcher (later phase)"
 "margin_debt_to_gdp","transform","transform",NA,"bubbles","monthly","pending:transform",NA,NA,"pending: transform formula needs non-FRED inputs"

@@ -56,7 +56,7 @@ TITLE_OVERRIDES <- list(
   cli_usa = "OECD CLI — US", gscpi = "Global supply chain pressure (NY Fed)",
   new_home_sales = "New home sales", mortgage_rate_30y = "30Y mortgage rate",
   ipo_spac_issuance = "IPO & SPAC issuance",
-  stocks_vs_bonds_real = "Stocks vs bonds (real)",
+  stocks_vs_bonds_real = "Stocks vs bonds — US", stocks_vs_bonds_euro_area = "Stocks vs bonds — Euro area",
   growth_inflation_regime = "Growth & inflation — US", regime_euro_area = "Growth & inflation — Euro area",
   regime_uk = "Growth & inflation — UK", regime_japan = "Growth & inflation — Japan",
   regime_china = "Growth & inflation — China"
@@ -108,7 +108,7 @@ UNITS <- list(
   cpi_uk = "%", cpi_japan = "%", cpi_china = "%", cpi_india = "%",
   # free replacements for licensed manual tiles
   ust10y_realized_vol = "bp", core_capex_orders = "$M", new_home_sales = "k",
-  mortgage_rate_30y = "%", gscpi = "σ", stocks_vs_bonds_real = "pp"
+  mortgage_rate_30y = "%", gscpi = "σ", stocks_vs_bonds_real = "pp", stocks_vs_bonds_euro_area = "pp"
 )
 
 display_title <- function(entry) TITLE_OVERRIDES[[entry$id]] %||% prettify_id(entry$id)

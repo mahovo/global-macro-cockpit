@@ -98,6 +98,11 @@ series:
   #      Treasuries (nominal yield minus the Cleveland Fed's expected inflation); the tile
   #      plots both lines and its value is the gap (computed in R/fetch.R). ----
   - { id: stocks_vs_bonds_real, after: buffett_indicator, provider: transform, inputs: [NFCPATAX, NCBEILQ027S, DGS10, EXPINF10YR], chart: pair, theme: bubbles, indicator_class: leading, frequency: daily }
+  #      The euro-area version, from ECB data: the after-tax earnings yield of euro-area
+  #      non-financial corporations (quarterly sector accounts) against the 10-year AAA
+  #      government yield minus the long-term inflation expectation of the ECB's Survey of
+  #      Professional Forecasters (computed in R/fetch.R). ----
+  - { id: stocks_vs_bonds_euro_area, after: stocks_vs_bonds_real, provider: transform, inputs: ["ECB/QSA/B4N", "ECB/QSA/D5", "ECB/QSA/F51", "ECB/YC/SR_10Y", "ECB/SPF/HICP.LT"], chart: pair, theme: bubbles, indicator_class: leading, frequency: daily }
 
   # ---- Cycle: growth/inflation regime (after Ray Dalio's four environments), the first
   #      tile of Cycle & Growth. Growth momentum is the 3-month change in the OECD CLI for

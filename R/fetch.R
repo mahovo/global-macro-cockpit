@@ -81,6 +81,30 @@
   tibble::tibble(date = cli$date, value = as.numeric(as.matrix(cli[names(geo)]) %*% (w / sum(w))))
 }
 
+# --- stocks vs bonds, expected real returns (after Ray Dalio) -----------------------------
+# Pair-tile data: the earnings yield (`ey`: date = quarter end, ey in %) carried forward to
+# each day of the nominal 10-year yield (`nom`: daily, %), against the expected real yield,
+# `nom` minus the latest expected inflation by each day (`inf`: date, %). `value` is the
+# gap in percentage points; `equity`, `bond` and `equity_asof` feed the two-line tile
+# (spark_plot_pair* in R/tiles.R).
+.stocks_vs_bonds <- function(ey, nom, inf, start) {
+  j    <- findInterval(nom$date, inf$date)
+  bond <- tibble::tibble(date = nom$date[j > 0], value = nom$value[j > 0] - inf$value[j[j > 0]])
+  i  <- findInterval(bond$date, ey$date)               # latest quarter ended by each day
+  ok <- i > 0
+  tibble::tibble(date = bond$date[ok], equity = ey$ey[i[ok]], bond = bond$value[ok],
+                 equity_asof = ey$date[i[ok]]) |>
+    dplyr::mutate(value = equity - bond) |>
+    dplyr::filter(!is.na(value), date >= as.Date(start)) |>
+    dplyr::arrange(date)
+}
+
+.quarter_end <- function(d) {                          # quarter start -> quarter end
+  m <- as.integer(format(d, "%m")) + 3
+  y <- as.integer(format(d, "%Y")) + (m > 12)
+  as.Date(sprintf("%d-%02d-01", y, ifelse(m > 12, m - 12, m))) - 1
+}
+
 ENTRY_OVERRIDES <- list(
   # OECD CLI: registry points at the discontinued OECD/MEI_CLI; use the live
   # OECD Data Explorer DF_CLI. "OECD" total isn't a valid REF_AREA, so use G20
@@ -133,32 +157,54 @@ ENTRY_OVERRIDES <- list(
   # on 10-year Treasuries: the nominal yield minus the Cleveland Fed's 10-year expected
   # inflation (monthly, carried forward). One measure for the whole history: TIPS yields
   # start only in 2003 and carried a large liquidity premium in their early years.
-  # `value` is the gap in percentage points; `equity`, `bond` and `equity_asof` feed the
-  # two-line tile (spark_plot_pair* in R/tiles.R).
+  # The pair data come from .stocks_vs_bonds() above.
   stocks_vs_bonds_real = list(
     access = "transform",
     fetch  = function(start, end, ttl) {
-      qend <- function(d) {                              # quarter start -> quarter end
-        m <- as.integer(format(d, "%m")) + 3
-        y <- as.integer(format(d, "%Y")) + (m > 12)
-        as.Date(sprintf("%d-%02d-01", y, ifelse(m > 12, m - 12, m))) - 1
-      }
       prof <- fred_series("NFCPATAX",    as.Date(start) - 200, end, ttl = ttl)   # $bn, SAAR
       eq   <- fred_series("NCBEILQ027S", as.Date(start) - 200, end, ttl = ttl)   # $m
-      nom  <- fred_series("DGS10",       start,                end, ttl = ttl)   # %, daily
-      inf  <- fred_series("EXPINF10YR",  as.Date(start) - 40,  end, ttl = ttl)   # %, monthly
-      j    <- findInterval(nom$date, inf$date)           # latest monthly estimate by each day
-      bond <- tibble::tibble(date = nom$date[j > 0], value = nom$value[j > 0] - inf$value[j[j > 0]])
       ey <- dplyr::inner_join(prof, eq, by = "date", suffix = c("_p", "_e")) |>
-        dplyr::transmute(date = qend(date), ey = 100 * value_p * 1000 / value_e) |>
+        dplyr::transmute(date = .quarter_end(date), ey = 100 * value_p * 1000 / value_e) |>
         dplyr::arrange(date)
-      i  <- findInterval(bond$date, ey$date)             # latest quarter ended by each day
-      ok <- i > 0
-      tibble::tibble(date = bond$date[ok], equity = ey$ey[i[ok]], bond = bond$value[ok],
-                     equity_asof = ey$date[i[ok]]) |>
-        dplyr::mutate(value = equity - bond) |>
-        dplyr::filter(!is.na(value), date >= as.Date(start)) |>
+      .stocks_vs_bonds(ey,
+        nom = fred_series("DGS10",      start,               end, ttl = ttl),    # %, daily
+        inf = fred_series("EXPINF10YR", as.Date(start) - 40, end, ttl = ttl),    # %, monthly
+        start = start)
+    }
+  ),
+  # Stocks vs bonds for the euro area, built like the US tile from ECB data. Stocks: the
+  # after-tax earnings yield of euro-area non-financial corporations: net entrepreneurial
+  # income minus current taxes on income over the last four quarters (the quarterly sector
+  # accounts are not seasonally adjusted), over all the equity they have issued at the
+  # quarter's end (listed and unlisted shares and other equity, since the income covers
+  # quasi-corporations too). The accounts are for the 21-country euro area, Bulgaria
+  # included (the 20-country series stopped at the end of 2025), back to 1999. Bonds: the
+  # 10-year AAA government yield (ECB yield curve, daily) minus the longer-term HICP
+  # expectation in the ECB's Survey of Professional Forecasters (quarterly).
+  stocks_vs_bonds_euro_area = list(
+    access = "transform",
+    fetch  = function(start, end, ttl) {
+      qsa <- function(key) ecb_series("QSA", paste0("Q.N.I10.W0.S11.S1.", key), NULL, end, ttl)
+      inc <- qsa("_Z.B.B4N._Z._Z._Z.XDC._T.S.V.N._T")   # net entrepreneurial income, EUR m
+      tax <- qsa("N.D.D5._Z._Z._Z.XDC._T.S.V.N._T")     # current taxes on income payable
+      eq  <- qsa("N.L.LE.F51._Z._Z.XDC._T.S.V.N._T")    # equity issued, end of quarter
+      fl  <- dplyr::inner_join(inc, tax, by = "date", suffix = c("_i", "_t")) |> dplyr::arrange(date)
+      ann <- tibble::tibble(date = fl$date,              # four-quarter sum after tax
+                            profit = as.numeric(stats::filter(fl$value_i - fl$value_t, rep(1, 4), sides = 1)))
+      ey  <- dplyr::inner_join(ann, eq, by = "date") |>
+        dplyr::transmute(date = .quarter_end(date), ey = 100 * profit / value) |>
+        dplyr::filter(!is.na(ey)) |>
         dplyr::arrange(date)
+      full <- .stocks_vs_bonds(ey,
+        nom = ecb_series("YC",  "B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y", NULL, end, ttl),
+        inf = ecb_series("SPF", "Q.U2.HICP.POINT.LT.Q.AVG", NULL, end, ttl),
+        start = as.Date("1999-01-01"))
+      # The level isn't comparable with the US tile (unlisted equity is valued differently),
+      # so the badge reads the latest gap against the whole history: `gap_rank` is the share
+      # of days since `hist_from` with a gap this narrow or narrower.
+      full$gap_rank  <- 100 * mean(full$value <= full$value[nrow(full)])
+      full$hist_from <- min(full$date)
+      dplyr::filter(full, date >= as.Date(start))
     }
   ),
   # Growth/inflation regimes (see .regime_series above), one per zone: the OECD leading

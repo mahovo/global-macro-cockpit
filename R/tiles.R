@@ -230,10 +230,12 @@ pair_detail <- function(df, mode = "level", tone = "neutral") {
   }
   quarter <- sprintf("Q%d %s", (as.integer(format(last$equity_asof, "%m")) - 1) %/% 3 + 1,
                      format(last$equity_asof, "%Y"))
+  # Each entry names its cadence: the stocks line steps once a quarter, bonds move daily.
   htmltools::span(class = "d-block text-muted",     # sits inside the tile's change line
-    key(PAIR_COLOUR[["equity"]]), sprintf("Stocks %.2f%% (%s)", last$equity, quarter),
-    htmltools::span(class = "ms-2"),
-    key(PAIR_COLOUR[["bond"]]), sprintf("Bonds %.2f%%", last$bond))
+    htmltools::span(class = "text-nowrap me-2", key(PAIR_COLOUR[["equity"]]),
+                    sprintf("Stocks %.2f%% (%s, quarterly)", last$equity, quarter)),
+    htmltools::span(class = "text-nowrap", key(PAIR_COLOUR[["bond"]]),
+                    sprintf("Bonds %.2f%% (daily)", last$bond)))
 }
 
 .add_pair_traces <- function(p, d, visible = TRUE) {
