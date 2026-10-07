@@ -131,14 +131,15 @@ spark_plot_modes <- function(df, frequency, tone = "neutral", ref = NA_real_, to
       d <- dplyr::bind_rows(d, ext)
     }
     # A 150 px sparkline can't show daily detail over years: for long series keep the
-    # last point of each ISO week, and round values (.page_round), to keep the page light.
+    # last point of each ISO week, and round values (.page_digits), to keep the page light.
     if (nrow(d) > 600) d <- d[!duplicated(format(d$date, "%G-%V"), fromLast = TRUE), ]
-    d$value <- .page_round(d$value, d$date, today)
+    dg <- .page_digits(d$value, d$date, today)
+    d$value <- round(d$value, dg)
     p <- plotly::add_trace(p, x = d$date, y = d$value, type = "scatter", mode = "lines",
       name = m, visible = identical(m, "level"),
       line = list(color = unname(TONE_COLOUR[[tone]]), width = 1.6,
                   shape = if (step) "hv" else "linear"),
-      hovertemplate = "%{x|%Y-%m-%d}<br>%{y:.4~g}<extra></extra>")
+      hovertemplate = .page_hover(dg))
     rl <- mode_ref(m, ref)
     if (!is.na(rl)) {
       p <- plotly::add_trace(p, x = range(d$date), y = c(rl, rl), type = "scatter",
@@ -160,18 +161,25 @@ spark_plot_modes <- function(df, frequency, tone = "neutral", ref = NA_real_, to
 
 .static_sparkline <- function(p) .static_plot(.sparkline_layout(p))
 
-# Static build: round plotted values so the page stays light without visible steps. The
-# step is a power of ten no larger than 1/250 of the range over the last year, the
-# tightest zoom, so it stays under half a pixel at every zoom. (A fixed 4 significant
-# digits left the CLIs, near 100 with small moves, one decimal: they drew as staircases.)
-.page_round <- function(x, date, today = Sys.Date()) {
+# Static build: decimals for a series' plotted values and tooltips, so the page stays
+# light without visible steps. The step is a power of ten no larger than 1/250 of the
+# range over the last year, the tightest zoom, so it stays under half a pixel at every
+# zoom; a flat series keeps 6 significant digits. (A fixed 4 significant digits left the
+# CLIs, near 100 with small moves, one decimal: they drew as staircases.)
+.page_digits <- function(x, date, today = Sys.Date()) {
   span <- function(v) if (length(v) > 1) diff(range(v)) else 0
   ok <- is.finite(x)
   r  <- span(x[ok & date >= today - 365])
   if (r == 0) r <- span(x[ok])
-  if (r == 0) return(signif(x, 6))
-  round(x, max(0, -floor(log10(r / 250))))
+  if (r > 0) return(max(0, -floor(log10(r / 250))))
+  m <- if (any(ok)) max(abs(x[ok])) else 0
+  if (m == 0) 0 else max(0, 5 - floor(log10(m)))
 }
+
+# Tooltip of a static mini-chart: the date, then the value at its plotted precision with
+# thousands separators and no trailing zeros (100.2968, 159,044, 4.12).
+.page_hover <- function(digits)
+  sprintf("%%{x|%%Y-%%m-%%d}<br>%%{y:,.%d~f}<extra></extra>", digits)
 
 # Static build: serialise only the built traces. By default plotly also embeds the raw
 # inputs (attrs) and rebuilds on render, roughly doubling the page size.
@@ -179,6 +187,12 @@ spark_plot_modes <- function(df, frequency, tone = "neutral", ref = NA_real_, to
   p <- plotly::plotly_build(p)
   p$x[c("attrs", "visdat", "cur_data")] <- NULL
   p$preRenderHook <- NULL
+  # plotly also repeats a trace's tooltip template for every point (half the page);
+  # one copy per trace does the same job.
+  for (i in seq_along(p$x$data)) {
+    h <- p$x$data[[i]]$hovertemplate
+    if (length(h) > 1 && all(h == h[1])) p$x$data[[i]]$hovertemplate <- h[1]
+  }
   p
 }
 
@@ -239,19 +253,21 @@ spark_plot_pair <- function(df, mode, tone = "neutral") {
 # Mini-chart of a pair tile for the static build: both lines for level mode, the gap's
 # z-score and percentile for the other modes (toggled by the page JavaScript).
 spark_plot_pair_modes <- function(df, tone = "neutral") {
-  thin <- function(d) {      # last point of each ISO week, values rounded for the page
-    if (nrow(d) > 600) d <- d[!duplicated(format(d$date, "%G-%V"), fromLast = TRUE), ]
-    for (col in intersect(c("value", "equity", "bond"), names(d))) d[[col]] <- .page_round(d[[col]], d$date)
-    d
+  thin <- function(d) {      # last point of each ISO week
+    if (nrow(d) > 600) d[!duplicated(format(d$date, "%G-%V"), fromLast = TRUE), ] else d
   }
-  p <- .add_pair_traces(plotly::plot_ly(height = 150), thin(df))
+  lv <- thin(df)
+  for (col in c("equity", "bond")) lv[[col]] <- round(lv[[col]], .page_digits(lv[[col]], lv$date))
+  p <- .add_pair_traces(plotly::plot_ly(height = 150), lv)
   for (m in c("z", "pct")) {
     g  <- thin(apply_mode(df, m))
+    dg <- .page_digits(g$value, g$date)
+    g$value <- round(g$value, dg)
     rl <- mode_ref(m, NA_real_)
     p <- p |>
       plotly::add_trace(x = g$date, y = g$value, type = "scatter", mode = "lines", name = m,
         visible = FALSE, line = list(color = unname(TONE_COLOUR[[tone]]), width = 1.6),
-        hovertemplate = "%{x|%Y-%m-%d}<br>%{y:.4~g}<extra></extra>") |>
+        hovertemplate = .page_hover(dg)) |>
       plotly::add_trace(x = range(g$date), y = c(rl, rl), type = "scatter", mode = "lines",
         name = paste0(m, "_ref"), visible = FALSE, hoverinfo = "skip",
         line = list(color = "#9e9e9e", width = 1, dash = "dash"))
