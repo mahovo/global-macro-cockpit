@@ -36,8 +36,8 @@ indicator.
   lines near crossing.
 - **Growth & inflation regime**: which of Dalio's four economic environments the US is in
   (growth rising or falling, crossed with inflation rising or falling), from the OECD
-  leading indicator and CPI, with the last 12 months on a quadrant and a strip of past
-  regimes.
+  leading indicator and CPI: a strip of past regimes (back to 1960 on the public site)
+  whose handles pick a period, traced on a quadrant.
 
 ## Two editions
 

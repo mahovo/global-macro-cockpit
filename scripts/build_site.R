@@ -74,7 +74,8 @@ message(sprintf("Fetching %d republishable series (%s to %s; FRED via %s)...",
                 length(to_fetch), START, TODAY, if (USES_API) "API" else "graph CSV"))
 DATA <- lapply(to_fetch, function(e) {
   tryCatch({
-    d <- fetch_series(e, START, TODAY, META)
+    # A tile can carry a longer history than the page's window (`site_from` in the registry).
+    d <- fetch_series(e, if (is.null(e$site_from)) START else as.Date(e$site_from), TODAY, META)
     if (is.null(d) || !nrow(d)) NULL else d
   }, error = function(err) { message("  ! ", e$id, ": ", conditionMessage(err)); NULL })
 })
@@ -93,7 +94,8 @@ mode_parts <- function(fun) {
 
 data_card <- function(e, df) {
   if (identical(e$chart, "regime"))    # one block, the same in every display mode
-    return(tile_shell(e, footer = attribution_tag(e, LIC), regime_body(df, e$frequency, static = TRUE)))
+    return(tile_shell(e, footer = attribution_tag(e, LIC),
+      regime_body(df, e$frequency, static = TRUE, from = TODAY - round(365.25 * 3))))
   ass  <- assess_for(e$id)
   tone <- if (is.null(ass)) "neutral" else ass(df)$tone
   unit <- display_unit(e)
@@ -300,7 +302,9 @@ body[data-mode='pct'] .mode-part[data-mode='pct'] { display: inline; }
 # Display-mode and zoom controls: toggle which precomputed traces are visible
 # (level / z / pct), set the x range, and fit the y range to what's in view.
 # Traces with other names (the regime tile's) keep their visibility, and charts
-# without a date axis (the regime quadrant) are not zoomed.
+# without a date axis (the regime quadrant) are not zoomed. The regime strip takes
+# the zoom only when the zoom changes, so a period picked with its handles survives
+# a change of display mode (R/tiles.R: REGIME_JS redraws the quadrant).
 # Plots rendered inside hidden tabs are resized when their tab is shown.
 JS <- "
 (function () {
@@ -327,7 +331,7 @@ JS <- "
     var pad = (hi - lo) * 0.08 || Math.abs(hi) * 0.05 || 1;
     return [lo - pad, hi + pad];
   }
-  function applyTo(gd, mode, x0, x1) {
+  function applyTo(gd, mode, x0, x1, zoomChanged) {
     if (!gd.data) return false;
     var vis = gd.data.map(function (t) {
       var n = t.name || '';
@@ -336,6 +340,7 @@ JS <- "
     Plotly.restyle(gd, { visible: vis }).then(function () {
       var fl = gd._fullLayout;
       if (!fl || !fl.xaxis || fl.xaxis.type !== 'date') return;
+      if (gd.layout.meta === 'regime-strip' && !zoomChanged) return;
       var upd = { 'xaxis.range': [x0, x1] };
       var yr = yRange(gd, x0, x1);
       if (yr) upd['yaxis.range'] = yr;
@@ -343,7 +348,7 @@ JS <- "
     });
     return true;
   }
-  var tries = 0;
+  var tries = 0, lastZoom = null;
   function update() {
     var mode = checked('mode', 'level');
     var years = +checked('zoom', '3');
@@ -351,12 +356,20 @@ JS <- "
     var end = new Date(), start = new Date();
     start.setDate(start.getDate() - Math.round(365.25 * years));
     var x0 = start.toISOString().slice(0, 10), x1 = end.toISOString().slice(0, 10);
-    var waiting = 0;
-    plots().forEach(function (gd) { if (!applyTo(gd, mode, x0, x1)) waiting++; });
+    var waiting = 0, zoomChanged = years !== lastZoom;
+    plots().forEach(function (gd) { if (!applyTo(gd, mode, x0, x1, zoomChanged)) waiting++; });
     if (waiting && tries++ < 20) setTimeout(update, 250);
+    else lastZoom = years;
   }
   document.addEventListener('change', function (e) {
     if (e.target && (e.target.name === 'mode' || e.target.name === 'zoom')) { tries = 0; update(); }
+  });
+  // Clicking the zoom already selected fires no change event; it should still reset a
+  // period picked on the regime strip.
+  document.addEventListener('click', function (e) {
+    if (e.target && e.target.name === 'zoom' && +e.target.value === lastZoom) {
+      lastZoom = null; tries = 0; update();
+    }
   });
   document.addEventListener('shown.bs.tab', function (e) {
     var sel = e.target.getAttribute('data-bs-target') || e.target.getAttribute('href');
@@ -383,6 +396,7 @@ page <- page_sidebar(
   do.call(navset_tab, lapply(VIEWS, view_panel)),
   footer,
   ESC_DISMISS_JS,
+  REGIME_JS,
   tags$script(HTML(JS))
 )
 

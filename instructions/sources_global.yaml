@@ -102,9 +102,10 @@ series:
   # ---- Cycle: growth/inflation regime (after Ray Dalio's four environments), the first
   #      tile of Cycle & Growth. Growth momentum is the 3-month change in the OECD CLI for
   #      the US; inflation momentum is headline CPI inflation minus its 12-month average
-  #      (computed in R/fetch.R). The tile plots the last 12 months on a quadrant and the
-  #      regime of each month on a strip below. ----
-  - { id: growth_inflation_regime, after: ppi_final_demand, provider: transform, inputs: ["DF_CLI:USA", CPIAUCSL], chart: regime, theme: cycle, indicator_class: leading, frequency: monthly }
+  #      (computed in R/fetch.R). The tile shows each month's regime on a strip whose
+  #      handles pick a period, traced on a quadrant above it. `site_from` gives the
+  #      public build this tile's full history rather than the page's 5-year window. ----
+  - { id: growth_inflation_regime, after: ppi_final_demand, provider: transform, inputs: ["DF_CLI:USA", CPIAUCSL], chart: regime, theme: cycle, indicator_class: leading, frequency: monthly, site_from: "1960-01-01" }
 
 # Manifest tiles removed from the dashboard. The global PMI is licensed, and the OECD G20
 # leading indicator (oecd_cli) already covers the global cycle.

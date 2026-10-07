@@ -130,7 +130,8 @@ ui <- page_sidebar(
       "Co-written by Claude Code Opus 5", br(), "Directed by Martin Hoshi Vognsen")
   ),
   do.call(navset_tab, lapply(VIEWS, view_panel)),
-  ESC_DISMISS_JS
+  ESC_DISMISS_JS,
+  REGIME_JS
 )
 
 # --- server ------------------------------------------------------------------

@@ -285,8 +285,11 @@ spark_plot_pair_modes <- function(df, tone = "neutral") {
 # --- growth/inflation regime tile -----------------------------------------------
 # The data carry `growth` (3-month change in the US CLI), `inflation` (CPI inflation
 # minus its 12-month average), `cli`, `cpi_yoy`, `cpi_avg12`, `since` and `before`
-# next to `value`, the regime code (REGIMES in R/assess.R). The tile looks the same in
-# every display mode: z-scores would move the zero lines that separate the regimes.
+# next to `value`, the regime code (REGIMES in R/assess.R). The strip shows the regime of
+# every month, and the quadrant traces the months in the strip's visible range, which the
+# handles under the strip (and the static page's zoom) set; REGIME_JS redraws the
+# quadrant when it changes. The tile looks the same in every display mode: z-scores
+# would move the zero lines that separate the regimes.
 
 # One colour per regime code. Any two regimes can sit side by side on the strip, so the
 # four were validated as a set against every pairing for colour-blind separation.
@@ -320,41 +323,62 @@ regime_detail <- function(df) {
       sprintf("Inflation: CPI %.2f%%, 12-month average %.2f%%", last$cpi_yoy, last$cpi_avg12)))
 }
 
+# The months a period from `from` to today shows: those whose middle falls inside it,
+# the rule REGIME_JS applies to the strip's range. Without `from`, every month.
+.regime_window <- function(df, from = NULL) {
+  if (is.null(from)) return(df)
+  w <- df[df$date + 15 >= as.Date(from), ]
+  if (nrow(w) >= 2) w else utils::tail(df, 12)
+}
+
 # Quadrant: growth momentum across, inflation momentum up, each regime's quadrant tinted
-# and named beside a swatch of its colour (the legend for the strip below), and the path
-# of the last `months` months ending in a larger dot.
-regime_quadrant <- function(df, months = 12) {
-  d  <- utils::tail(df, months)
+# and named, with a swatch of its colour, above the plot in two rows (upper quadrants
+# first), on its quadrant's side; the names are the legend for the strip too. The path
+# covers the period: its last 12 months dark, earlier months light, the final month a
+# larger dot. The axes stay symmetric, so tints and zero lines sit in paper coordinates
+# and a new period only changes the traces and axis ranges.
+REGIME_FADED <- "#c3c2b7"
+
+regime_quadrant <- function(df, from = NULL) {
+  d  <- .regime_window(df, from)
   n  <- nrow(d)
+  k0 <- max(1, n - 11)                     # first month of the dark stretch
   xr <- 1.3 * max(0.3, abs(d$growth))      # symmetric ranges keep the origin centred
   yr <- 1.3 * max(0.3, abs(d$inflation))
   sx <- ifelse(REGIMES$growth, 1, -1)
   sy <- ifelse(REGIMES$inflation, 1, -1)
   tints <- lapply(REGIMES$code, function(k) list(type = "rect", layer = "below",
-    x0 = 0, x1 = sx[k] * xr, y0 = 0, y1 = sy[k] * yr, line = list(width = 0),
-    fillcolor = .rgba(REGIME_COLOUR[k], 0.12)))
+    xref = "paper", yref = "paper", x0 = 0.5, x1 = 0.5 + sx[k] / 2, y0 = 0.5,
+    y1 = 0.5 + sy[k] / 2, line = list(width = 0), fillcolor = .rgba(REGIME_COLOUR[k], 0.12)))
   zero <- list(color = "#b5b4ad", width = 1)
   lines <- list(
-    list(type = "line", layer = "below", x0 = 0, x1 = 0, y0 = -yr, y1 = yr, line = zero),
-    list(type = "line", layer = "below", x0 = -xr, x1 = xr, y0 = 0, y1 = 0, line = zero))
+    list(type = "line", layer = "below", xref = "paper", yref = "paper",
+         x0 = 0.5, x1 = 0.5, y0 = 0, y1 = 1, line = zero),
+    list(type = "line", layer = "below", xref = "paper", yref = "paper",
+         x0 = 0, x1 = 1, y0 = 0.5, y1 = 0.5, line = zero))
   labels <- lapply(REGIMES$code, function(k) list(
-    x = sx[k] * xr, y = sy[k] * yr, xref = "x", yref = "y", showarrow = FALSE,
+    x = if (sx[k] > 0) 1 else 0, y = 1, xref = "paper", yref = "paper",
+    showarrow = FALSE, font = .AXIS_FONT,
     text = sprintf('<span style="color:%s;font-size:12px">■</span> %s', REGIME_COLOUR[k],
-                   gsub(" ", "<br>", REGIMES$name[k])), font = .AXIS_FONT,
-    align = if (sx[k] > 0) "right" else "left",
-    xanchor = if (sx[k] > 0) "right" else "left", yanchor = if (sy[k] > 0) "top" else "bottom",
-    xshift = -3 * sx[k], yshift = -2 * sy[k]))
+                   REGIMES$name[k]),
+    xanchor = if (sx[k] > 0) "right" else "left", yanchor = "bottom",
+    yshift = if (sy[k] > 0) 17 else 2))      # upper quadrants' names on the top row
   hover <- sprintf("%s: %s<br>Growth %+.2f, inflation %+.2f pp", .month_label(d$date),
                    REGIMES$name[d$value], d$growth, d$inflation)
-  plotly::plot_ly(height = 170) |>
-    plotly::add_trace(x = d$growth, y = d$inflation, type = "scatter", mode = "lines+markers",
-      name = "path", line = list(color = REGIME_INK, width = 2),
-      marker = list(size = 6, color = REGIME_INK), hovertext = hover, hoverinfo = "text") |>
+  # Three traces always exist, named for REGIME_JS; with 12 months or fewer the "earlier"
+  # trace is the path's first point, hidden under it.
+  plotly::plot_ly(height = 204) |>
+    plotly::add_trace(x = d$growth[1:k0], y = d$inflation[1:k0], type = "scatter",
+      mode = "lines+markers", name = "earlier", line = list(color = REGIME_FADED, width = 1.5),
+      marker = list(size = 4, color = REGIME_FADED), hovertext = hover[1:k0], hoverinfo = "text") |>
+    plotly::add_trace(x = d$growth[k0:n], y = d$inflation[k0:n], type = "scatter",
+      mode = "lines+markers", name = "path", line = list(color = REGIME_INK, width = 2),
+      marker = list(size = 6, color = REGIME_INK), hovertext = hover[k0:n], hoverinfo = "text") |>
     plotly::add_trace(x = d$growth[n], y = d$inflation[n], type = "scatter", mode = "markers",
       name = "latest", marker = list(size = 11, color = REGIME_INK, line = list(color = "#ffffff", width = 2)),
       hovertext = hover[n], hoverinfo = "text") |>
-    plotly::layout(showlegend = FALSE, margin = list(l = 48, r = 5, t = 5, b = 34),
-      shapes = c(tints, lines), annotations = labels,
+    plotly::layout(meta = "regime-quadrant", showlegend = FALSE,
+      margin = list(l = 48, r = 5, t = 36, b = 32), shapes = c(tints, lines), annotations = labels,
       xaxis = list(range = c(-xr, xr), zeroline = FALSE, showgrid = FALSE, nticks = 5,
                    tickfont = .AXIS_FONT, title = list(text = "CLI change over 3 months",
                    font = .AXIS_FONT, standoff = 4)),
@@ -364,41 +388,67 @@ regime_quadrant <- function(df, months = 12) {
     plotly::config(displayModeBar = FALSE, responsive = TRUE)
 }
 
-# Strip: one bar per spell of a regime across the data's window, on a date axis (the
-# static page's zoom sets its range). Hover gives each spell's full span.
-regime_strip <- function(df) {
+# Strip: one bar per spell of a regime on a date axis, with a range slider under it over
+# the whole history: its handles choose the period the quadrant traces. `from` sets the
+# initial range (the static page's default zoom); without it the strip shows everything.
+# Hover gives each spell's full span.
+regime_strip <- function(df, from = NULL, to = Sys.Date()) {
   run   <- cumsum(c(TRUE, diff(df$value) != 0))
   first <- !duplicated(run)
   last  <- !duplicated(run, fromLast = TRUE)
-  from  <- df$date[first]
-  to    <- .next_month(df$date[last])
+  start <- df$date[first]                 # each spell's first month and the month after it
+  stop  <- .next_month(df$date[last])
   code  <- df$value[first]
-  began <- df$since[first]                # a spell can start before the window
+  began <- df$since[first]                # a spell can start before the data's window
   n_mo  <- (as.integer(format(df$date[last], "%Y")) - as.integer(format(began, "%Y"))) * 12 +
            as.integer(format(df$date[last], "%m")) - as.integer(format(began, "%m")) + 1
   hover <- sprintf("%s<br>%s – %s (%d month%s)", REGIMES$name[code], .month_label(began),
                    .month_label(df$date[last]), n_mo, ifelse(n_mo == 1, "", "s"))
-  plotly::plot_ly(height = 46) |>
-    plotly::add_trace(type = "bar", orientation = "h", y = rep(0, length(from)),
-      x = as.numeric(to - from) * 86400000, base = format(from), name = "regime",
-      marker = list(color = REGIME_COLOUR[code], line = list(color = "#ffffff", width = 1)),
+  # The bars touch without separators: over decades, in the slider's overview, gaps between
+  # spells would outweigh the colours.
+  # The slider is as tall as the strip (thickness 1) and sits in the bottom margin, below
+  # the tick labels: 24 px strip + 54 px margin. Left to itself, plotly would push the
+  # margin and keep the strip at least 64 px tall.
+  xaxis <- list(type = "date", showgrid = FALSE, tickfont = .AXIS_FONT, title = "",
+                rangeslider = list(visible = TRUE, thickness = 1, bgcolor = "#ffffff",
+                                   bordercolor = "#c3c2b7", borderwidth = 1))
+  if (!is.null(from)) xaxis$range <- c(format(as.Date(from)), format(to))
+  plotly::plot_ly(height = 80) |>
+    plotly::add_trace(type = "bar", orientation = "h", y = rep(0, length(start)),
+      x = as.numeric(stop - start) * 86400000, base = format(start), name = "regime",
+      marker = list(color = REGIME_COLOUR[code], line = list(width = 0)),
       hovertext = hover, hoverinfo = "text") |>
-    plotly::layout(showlegend = FALSE, bargap = 0, margin = list(l = 48, r = 5, t = 2, b = 20),
-      xaxis = list(type = "date", showgrid = FALSE, tickfont = .AXIS_FONT, title = ""),
+    plotly::layout(meta = "regime-strip", showlegend = FALSE, bargap = 0,
+      margin = list(l = 48, r = 5, t = 2, b = 54), xaxis = xaxis,
       yaxis = list(visible = FALSE, range = c(-0.5, 0.5), fixedrange = TRUE)) |>
     plotly::config(displayModeBar = FALSE, responsive = TRUE)
 }
 
-# Key for the quadrant's path (the quadrant labels carry the regime colours).
-regime_key <- function(df) {
+# Key for the quadrant's path, and the period it covers. REGIME_JS keeps the month labels
+# and the "Earlier" entry (shown only when the period has more than 12 months) in step.
+regime_key <- function(df, from = NULL) {
+  d    <- .regime_window(df, from)
+  last <- .month_label(d$date[nrow(d)])
   htmltools::div(class = "small text-muted mt-1",
-    .key_line(REGIME_INK), "Last 12 months", htmltools::span(class = "ms-2"),
-    .key_dot(REGIME_INK), .month_label(df$date[nrow(df)]))
+    htmltools::div(
+      .key_line(REGIME_INK), "Last 12 months", htmltools::span(class = "ms-2"),
+      htmltools::span(class = "regime-earlier-key", style = if (nrow(d) <= 12) "display:none",
+        .key_line(REGIME_FADED), "Earlier", htmltools::span(class = "ms-2")),
+      .key_dot(REGIME_INK), htmltools::span(class = "regime-end", last)),
+    htmltools::div(
+      htmltools::span(class = "regime-period", paste(.month_label(d$date[1]), "–", last)),
+      htmltools::span(class = "text-nowrap", "(drag the handles to change it)")))
+}
+
+# The tile's monthly history for REGIME_JS: dates, the two readings and the regime codes.
+.regime_json <- function(df) {
+  as.character(jsonlite::toJSON(list(date = format(df$date), g = round(df$growth, 4),
+    i = round(df$inflation, 4), r = as.integer(df$value), names = REGIMES$name), digits = NA))
 }
 
 # The whole tile body, shared by the app (renderUI) and the static build (static = TRUE
-# strips plotly's raw inputs from the page).
-regime_body <- function(df, frequency, static = FALSE) {
+# strips plotly's raw inputs from the page). `from` is the start of the initial period.
+regime_body <- function(df, frequency, static = FALSE, from = NULL) {
   fin <- if (static) .static_plot else identity
   htmltools::tagList(
     # One line of words, a step smaller than the other tiles' figures; on a narrow card
@@ -408,7 +458,78 @@ regime_body <- function(df, frequency, static = FALSE) {
       htmltools::div(class = "small text-muted text-nowrap", asof_tag(df, frequency))),
     htmltools::div(class = "small mb-1", regime_detail(df)),
     badge_tag(assess_regime, df),
-    fin(regime_quadrant(df)),
-    fin(regime_strip(df)),
-    regime_key(df))
+    htmltools::div(class = "regime-tile",
+      htmltools::tags$script(type = "application/json", class = "regime-data",
+                             htmltools::HTML(.regime_json(df))),
+      fin(regime_quadrant(df, from)),
+      fin(regime_strip(df, from)),
+      regime_key(df, from)))
 }
+
+# Page script for the regime tile, in both editions. When the strip's visible range
+# changes (its handles, the static page's zoom, a drag across the strip), it redraws the
+# quadrant for the months whose middle falls in that range: the three path traces, the
+# axis ranges and the key's labels. It looks for new tiles every 0.7 s, because the app
+# renders the tile after the page loads (and again on refresh).
+REGIME_JS <- htmltools::tags$script(htmltools::HTML("
+(function () {
+  var MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function ms(v) {
+    if (typeof v === 'number') return v;
+    var s = String(v);
+    return Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10) || 1,
+                    +s.slice(11, 13) || 0, +s.slice(14, 16) || 0);
+  }
+  function label(d) { return MON[+d.slice(5, 7) - 1] + ' ' + d.slice(0, 4); }
+  function signed(v) { return (v >= 0 ? '+' : '') + v.toFixed(2); }
+  function plotIn(box, meta) {
+    var gds = box.querySelectorAll('.js-plotly-plot');
+    for (var i = 0; i < gds.length; i++) if (gds[i].layout && gds[i].layout.meta === meta) return gds[i];
+    return null;
+  }
+  function draw(box) {
+    var D = box._regime, q = box._quad, r = box._strip.layout.xaxis.range;
+    if (!r) return;
+    var x0 = ms(r[0]), x1 = ms(r[1]), idx = [];
+    for (var i = 0; i < D.date.length; i++) {
+      var t = ms(D.date[i]) + 15 * 864e5;
+      if (t >= x0 && t <= x1) idx.push(i);
+    }
+    if (idx.length < 2) return;
+    var n = idx.length, k = Math.max(0, n - 12), gx = 0.3, gy = 0.3, at = {};
+    idx.forEach(function (m) { gx = Math.max(gx, Math.abs(D.g[m])); gy = Math.max(gy, Math.abs(D.i[m])); });
+    function part(a, b) {
+      var o = {x: [], y: [], h: []};
+      for (var j = a; j <= b; j++) {
+        var m = idx[j];
+        o.x.push(D.g[m]); o.y.push(D.i[m]);
+        o.h.push(label(D.date[m]) + ': ' + D.names[D.r[m] - 1] + '<br>Growth ' + signed(D.g[m]) +
+                 ', inflation ' + signed(D.i[m]) + ' pp');
+      }
+      return o;
+    }
+    var e = part(0, k), p = part(k, n - 1), z = part(n - 1, n - 1);
+    q.data.forEach(function (tr, j) { at[tr.name] = j; });
+    Plotly.restyle(q, {x: [e.x, p.x, z.x], y: [e.y, p.y, z.y], hovertext: [e.h, p.h, z.h]},
+                   [at.earlier, at.path, at.latest]);
+    Plotly.relayout(q, {'xaxis.range': [-1.3 * gx, 1.3 * gx], 'yaxis.range': [-1.3 * gy, 1.3 * gy]});
+    var first = label(D.date[idx[0]]), last = label(D.date[idx[n - 1]]);
+    box.querySelector('.regime-end').textContent = last;
+    box.querySelector('.regime-period').textContent = first + ' – ' + last;
+    box.querySelector('.regime-earlier-key').style.display = n > 12 ? '' : 'none';
+  }
+  function init() {
+    var boxes = document.querySelectorAll('.regime-tile:not(.regime-ready)');
+    Array.prototype.forEach.call(boxes, function (box) {
+      var q = plotIn(box, 'regime-quadrant'), s = plotIn(box, 'regime-strip');
+      if (!q || !s || !s.on || !s._fullLayout) return;
+      box._regime = JSON.parse(box.querySelector('script.regime-data').textContent);
+      box._quad = q; box._strip = s;
+      box.classList.add('regime-ready');
+      s.on('plotly_relayout', function () { draw(box); });
+      draw(box);
+    });
+  }
+  setInterval(init, 700);
+})();
+"))
