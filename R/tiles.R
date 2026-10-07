@@ -193,8 +193,15 @@ spark_plot_modes <- function(df, frequency, tone = "neutral", ref = NA_real_, to
     h <- p$x$data[[i]]$hovertemplate
     if (length(h) > 1 && all(h == h[1])) p$x$data[[i]]$hovertemplate <- h[1]
   }
+  attr(p$x, "TOJSON_FUNC") <- .page_json
   p
 }
+
+# plotly's JSON writer with numbers at up to 15 significant digits instead of full binary
+# precision (100.4, not 100.40000000000001): shorter, and the values read back the same.
+.page_json <- function(x, ...)
+  jsonlite::toJSON(x, digits = NA, auto_unbox = TRUE, force = TRUE, null = "null",
+                   na = "null", time_format = "%Y-%m-%d %H:%M:%OS6", ...)
 
 # Legend glyphs drawn beside text: a short line and a dot.
 .key_line <- function(colour) htmltools::span(style = sprintf(
