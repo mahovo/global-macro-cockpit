@@ -131,9 +131,9 @@ spark_plot_modes <- function(df, frequency, tone = "neutral", ref = NA_real_, to
       d <- dplyr::bind_rows(d, ext)
     }
     # A 150 px sparkline can't show daily detail over years: for long series keep the
-    # last point of each ISO week, and 4 significant digits, to keep the page light.
+    # last point of each ISO week, and round values (.page_round), to keep the page light.
     if (nrow(d) > 600) d <- d[!duplicated(format(d$date, "%G-%V"), fromLast = TRUE), ]
-    d$value <- signif(d$value, 4)
+    d$value <- .page_round(d$value, d$date, today)
     p <- plotly::add_trace(p, x = d$date, y = d$value, type = "scatter", mode = "lines",
       name = m, visible = identical(m, "level"),
       line = list(color = unname(TONE_COLOUR[[tone]]), width = 1.6,
@@ -159,6 +159,19 @@ spark_plot_modes <- function(df, frequency, tone = "neutral", ref = NA_real_, to
 }
 
 .static_sparkline <- function(p) .static_plot(.sparkline_layout(p))
+
+# Static build: round plotted values so the page stays light without visible steps. The
+# step is a power of ten no larger than 1/250 of the range over the last year, the
+# tightest zoom, so it stays under half a pixel at every zoom. (A fixed 4 significant
+# digits left the CLIs, near 100 with small moves, one decimal: they drew as staircases.)
+.page_round <- function(x, date, today = Sys.Date()) {
+  span <- function(v) if (length(v) > 1) diff(range(v)) else 0
+  ok <- is.finite(x)
+  r  <- span(x[ok & date >= today - 365])
+  if (r == 0) r <- span(x[ok])
+  if (r == 0) return(signif(x, 6))
+  round(x, max(0, -floor(log10(r / 250))))
+}
 
 # Static build: serialise only the built traces. By default plotly also embeds the raw
 # inputs (attrs) and rebuilds on render, roughly doubling the page size.
@@ -226,9 +239,9 @@ spark_plot_pair <- function(df, mode, tone = "neutral") {
 # Mini-chart of a pair tile for the static build: both lines for level mode, the gap's
 # z-score and percentile for the other modes (toggled by the page JavaScript).
 spark_plot_pair_modes <- function(df, tone = "neutral") {
-  thin <- function(d) {      # last point of each ISO week, 4 significant digits
+  thin <- function(d) {      # last point of each ISO week, values rounded for the page
     if (nrow(d) > 600) d <- d[!duplicated(format(d$date, "%G-%V"), fromLast = TRUE), ]
-    for (col in intersect(c("value", "equity", "bond"), names(d))) d[[col]] <- signif(d[[col]], 4)
+    for (col in intersect(c("value", "equity", "bond"), names(d))) d[[col]] <- .page_round(d[[col]], d$date)
     d
   }
   p <- .add_pair_traces(plotly::plot_ly(height = 150), thin(df))
