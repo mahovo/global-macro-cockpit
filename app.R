@@ -163,7 +163,7 @@ server <- function(input, output, session) {
     output[[paste0("body_", ent$id)]] <- renderUI({
       raw <- dr()
       validate(need(!is.null(raw) && nrow(raw) > 0, "No data — click Refresh."))
-      regime_body(raw, ent$frequency)
+      regime_body(raw, ent)
     })
   })
 

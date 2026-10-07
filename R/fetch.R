@@ -12,6 +12,75 @@
 # or placeholder references (e.g. oecd_cli -> dead OECD/MEI_CLI; ecb_policy_rate
 # -> a search string, not a code). ENTRY_OVERRIDES maps those ids to a concrete,
 # verified fetch closure, keeping the YAML pure data.
+
+# --- growth/inflation regimes (after Ray Dalio's four economic environments) --------
+# A regime series from a monthly leading indicator (`cli`: date, value) and headline
+# inflation year on year (`yoy`: date, value, %). Growth momentum is the indicator's
+# 3-month change (index points); inflation momentum is inflation minus its average over
+# the past 12 months (percentage points; an isolated missing month is filled in from its
+# neighbours). Above zero counts as rising. `value` is the regime code: 1 growth up /
+# inflation down (Goldilocks), 2 both up (Reflation), 3 growth down / inflation up
+# (Stagflation), 4 both down (Disinflationary slowdown); names, tones and colours live in
+# R/assess.R and R/tiles.R. `since` and `before` give the start of each month's spell and
+# the regime before it. At least 12 months are returned, so a tile's path is complete.
+.regime_series <- function(cli, yoy, start) {
+  cm  <- seq(min(cli$date), max(cli$date), by = "month")
+  lev <- cli$value[match(cm, cli$date)]
+  ym  <- seq(min(yoy$date), max(yoy$date), by = "month")
+  inf <- stats::approx(yoy$date, yoy$value, xout = ym)$y
+  avg <- as.numeric(stats::filter(inf, rep(1 / 12, 12), sides = 1))
+  d <- dplyr::inner_join(
+    tibble::tibble(date = cm, cli = lev, growth = lev - dplyr::lag(lev, 3)),
+    tibble::tibble(date = ym, cpi_yoy = inf, cpi_avg12 = avg, inflation = inf - avg),
+    by = "date") |>
+    dplyr::filter(!is.na(growth), !is.na(inflation)) |>
+    dplyr::arrange(date) |>
+    dplyr::mutate(value = ifelse(growth > 0, ifelse(inflation > 0, 2, 1),
+                                 ifelse(inflation > 0, 3, 4)))
+  if (!nrow(d)) return(d)
+  spell    <- cumsum(c(TRUE, diff(d$value) != 0))
+  first    <- match(spell, spell)                    # first row of each row's spell
+  d$since  <- d$date[first]
+  d$before <- ifelse(first > 1, d$value[pmax(first - 1, 1)], NA)
+  keep <- min(as.Date(start), seq(max(d$date), by = "-11 months", length.out = 2)[2])
+  dplyr::filter(d, date >= keep)
+}
+
+# Fetch closure for a regime tile. `cli` and `yoy` are functions of (from, end, ttl);
+# they fetch from five years before the window (23 months feed the first value, the
+# rest finds where the first spell began).
+.regime_fetch <- function(cli, yoy) {
+  function(start, end, ttl) {
+    from <- as.Date(start) - 5 * 366
+    .regime_series(cli(from, end, ttl), yoy(from, end, ttl), start)
+  }
+}
+
+# Inflation year on year from a monthly price index. A month that was never published
+# (US CPI for October 2025, during the federal shutdown) is filled in log-linearly from
+# its neighbours before the rate is taken.
+.yoy_from_index <- function(idx) {
+  months <- seq(min(idx$date), max(idx$date), by = "month")
+  lvl <- exp(stats::approx(idx$date, log(idx$value), xout = months)$y)
+  tibble::tibble(date = months, value = 100 * (lvl / dplyr::lag(lvl, 12) - 1)) |>
+    dplyr::filter(!is.na(value))
+}
+
+# Euro-area leading indicator. The OECD publishes none, so this averages the OECD
+# indicators for the four largest euro economies, weighted by their nominal GDP in the
+# latest year Eurostat has for all four, over the months all four indicators cover.
+.cli_euro_area <- function(from, end, ttl) {
+  geo <- c(DEU = "DE", FRA = "FR", ITA = "IT", ESP = "ES")
+  gdp <- lapply(geo, function(g)
+    eurostat_series("nama_10_gdp", paste0("A.CP_MEUR.B1GQ.", g), Sys.Date() - 6 * 366, end, ttl))
+  year <- max(Reduce(intersect, lapply(gdp, function(x) as.character(x$date))))
+  w    <- vapply(gdp, function(x) x$value[as.character(x$date) == year], numeric(1))
+  cli  <- Reduce(function(a, b) dplyr::inner_join(a, b, by = "date"),
+                 lapply(names(geo), function(a)
+                   dplyr::rename(oecd_cli(a, from, end), !!a := value)))
+  tibble::tibble(date = cli$date, value = as.numeric(as.matrix(cli[names(geo)]) %*% (w / sum(w))))
+}
+
 ENTRY_OVERRIDES <- list(
   # OECD CLI: registry points at the discontinued OECD/MEI_CLI; use the live
   # OECD Data Explorer DF_CLI. "OECD" total isn't a valid REF_AREA, so use G20
@@ -92,46 +161,26 @@ ENTRY_OVERRIDES <- list(
         dplyr::arrange(date)
     }
   ),
-  # Growth/inflation regime, after Ray Dalio's four economic environments. Growth
-  # momentum: the 3-month change in the OECD CLI for the US (index points). Inflation
-  # momentum: headline CPI inflation, year on year, minus its average over the past 12
-  # months (percentage points). Above zero counts as rising. `value` is the regime code:
-  # 1 growth up / inflation down (Goldilocks), 2 both up (Reflation), 3 growth down /
-  # inflation up (Stagflation), 4 both down (Disinflationary slowdown); names, tones and
-  # colours live in R/assess.R and R/tiles.R. `since` and `before` give the start of the
-  # current spell and the regime before it, worked out on the longer history fetched
-  # here. At least 12 months are returned, so the quadrant's path is always complete.
-  growth_inflation_regime = list(
-    access = "transform",
-    fetch  = function(start, end, ttl) {
-      from <- as.Date(start) - 5 * 366       # 23 months feed the first value; the rest finds spell starts
-      cli  <- oecd_cli("USA", from, end)
-      cpi  <- fred_series("CPIAUCSL", from, end, ttl = ttl)
-      # A month BLS never published (October 2025, during the federal shutdown) is filled
-      # in log-linearly from its neighbours before any rate is taken.
-      months <- seq(min(cpi$date), max(cpi$date), by = "month")
-      lvl  <- exp(stats::approx(cpi$date, log(cpi$value), xout = months)$y)
-      yoy  <- 100 * (lvl / dplyr::lag(lvl, 12) - 1)
-      avg  <- as.numeric(stats::filter(yoy, rep(1 / 12, 12), sides = 1))
-      cm   <- seq(min(cli$date), max(cli$date), by = "month")
-      lev  <- cli$value[match(cm, cli$date)]
-      d <- dplyr::inner_join(
-        tibble::tibble(date = cm, cli = lev, growth = lev - dplyr::lag(lev, 3)),
-        tibble::tibble(date = months, cpi_yoy = yoy, cpi_avg12 = avg, inflation = yoy - avg),
-        by = "date") |>
-        dplyr::filter(!is.na(growth), !is.na(inflation)) |>
-        dplyr::arrange(date) |>
-        dplyr::mutate(value = ifelse(growth > 0, ifelse(inflation > 0, 2, 1),
-                                     ifelse(inflation > 0, 3, 4)))
-      if (!nrow(d)) return(d)
-      spell    <- cumsum(c(TRUE, diff(d$value) != 0))
-      first    <- match(spell, spell)                    # first row of each row's spell
-      d$since  <- d$date[first]
-      d$before <- ifelse(first > 1, d$value[pmax(first - 1, 1)], NA)
-      keep <- min(as.Date(start), seq(max(d$date), by = "-11 months", length.out = 2)[2])
-      dplyr::filter(d, date >= keep)
-    }
-  ),
+  # Growth/inflation regimes (see .regime_series above), one per zone: the OECD leading
+  # indicator against headline inflation from the statistics office or its official
+  # copy: US CPI (BLS via FRED), euro-area HICP (Eurostat), UK CPI (ONS), and CPI for
+  # Japan and China from the IMF's CPI dataset (a few weeks behind the national releases).
+  growth_inflation_regime = list(access = "transform", fetch = .regime_fetch(
+    cli = function(from, end, ttl) oecd_cli("USA", from, end),
+    yoy = function(from, end, ttl) .yoy_from_index(fred_series("CPIAUCSL", from, end, ttl = ttl)))),
+  regime_euro_area = list(access = "transform", fetch = .regime_fetch(
+    cli = .cli_euro_area,
+    yoy = function(from, end, ttl) eurostat_series("prc_hicp_minr", "M.RCH_A.TOTAL.EA20", from, end, ttl))),
+  regime_uk = list(access = "transform", fetch = .regime_fetch(
+    cli = function(from, end, ttl) oecd_cli("GBR", from, end),
+    yoy = function(from, end, ttl)
+      ons_series("/economy/inflationandpriceindices/timeseries/d7g7/mm23", from, end, ttl))),
+  regime_japan = list(access = "transform", fetch = .regime_fetch(
+    cli = function(from, end, ttl) oecd_cli("JPN", from, end),
+    yoy = function(from, end, ttl) imf_series("IMF.STA,CPI", "JPN.CPI._T.YOY_PCH_PA_PT.M", from, end, ttl))),
+  regime_china = list(access = "transform", fetch = .regime_fetch(
+    cli = function(from, end, ttl) oecd_cli("CHN", from, end),
+    yoy = function(from, end, ttl) imf_series("IMF.STA,CPI", "CHN.CPI._T.YOY_PCH_PA_PT.M", from, end, ttl))),
   # Buffett indicator: the registry's Wilshire id (WILL5000PRFC) 404s on the
   # keyless endpoint. Use the Z.1 corporate-equity market value (NCBEILQ027S,
   # $M) over GDP ($B) — the cleaner flow-of-funds version of the same gauge.

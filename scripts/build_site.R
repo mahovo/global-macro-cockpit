@@ -95,7 +95,7 @@ mode_parts <- function(fun) {
 data_card <- function(e, df) {
   if (identical(e$chart, "regime"))    # one block, the same in every display mode
     return(tile_shell(e, footer = attribution_tag(e, LIC),
-      regime_body(df, e$frequency, static = TRUE, from = TODAY - round(365.25 * 3))))
+      regime_body(df, e, static = TRUE, from = TODAY - round(365.25 * 3))))
   ass  <- assess_for(e$id)
   tone <- if (is.null(ass)) "neutral" else ass(df)$tone
   unit <- display_unit(e)
@@ -250,7 +250,7 @@ footer <- div(class = "about-data small text-muted mt-5 pt-3 border-top",
   tags$ul(class = "mb-2", lapply(attributions, source_item)),
   p("Z-scores, percentiles, changes versus the prior observation and series derived from ",
     "several inputs (such as net liquidity, the equity/GDP ratio and the growth/inflation ",
-    "regime) are computed by this site from the original series. They are adaptations of ",
+    "regimes) are computed by this site from the original series. They are adaptations of ",
     "the original works and are not endorsed by the source organisations."),
   p("This is an adaptation of an original work by the OECD. The opinions expressed and ",
     "arguments employed in this adaptation should not be reported as representing the ",

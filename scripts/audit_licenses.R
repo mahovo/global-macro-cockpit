@@ -40,7 +40,8 @@ cat(sprintf("Checking %d FRED-sourced rows against the FRED API...\n\n", nrow(fr
 report <- do.call(rbind, lapply(seq_len(nrow(fred_rows)), function(i) {
   r <- fred_rows[i, ]
   ids <- trimws(strsplit(r$source_ids, ";", fixed = TRUE)[[1]])
-  ids <- ids[!grepl(":", ids, fixed = TRUE)]     # other providers' inputs, e.g. OECD's DF_CLI:USA
+  ids <- ids[grepl("^[A-Z0-9]+$", ids)]     # FRED ids; other providers' (DF_CLI:USA, Eurostat/...) are skipped
+  if (!length(ids)) return(NULL)            # no FRED inputs to check
   classes <- vapply(ids, fred_copyright_class, character(1))
   data.frame(id = r$id, source_ids = r$source_ids, table = r$licence_class,
              fred = classes[which.max(RANK[classes])], stringsAsFactors = FALSE)

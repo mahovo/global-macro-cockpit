@@ -170,7 +170,8 @@ ASSESSORS <- list(
   cpi_uk = assess_cpi, cpi_japan = assess_cpi, cpi_china = assess_cpi, cpi_india = assess_cpi,
   # free replacements for licensed manual tiles
   cli_usa = assess_cli, gscpi = assess_gscpi, stocks_vs_bonds_real = assess_stocks_bonds,
-  growth_inflation_regime = assess_regime
+  growth_inflation_regime = assess_regime, regime_euro_area = assess_regime,
+  regime_uk = assess_regime, regime_japan = assess_regime, regime_china = assess_regime
 )
 
 #' Assessor for a series id, or NULL.

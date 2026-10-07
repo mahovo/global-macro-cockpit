@@ -57,7 +57,9 @@ TITLE_OVERRIDES <- list(
   new_home_sales = "New home sales", mortgage_rate_30y = "30Y mortgage rate",
   ipo_spac_issuance = "IPO & SPAC issuance",
   stocks_vs_bonds_real = "Stocks vs bonds (real)",
-  growth_inflation_regime = "Growth & inflation regime"
+  growth_inflation_regime = "Growth & inflation — US", regime_euro_area = "Growth & inflation — Euro area",
+  regime_uk = "Growth & inflation — UK", regime_japan = "Growth & inflation — Japan",
+  regime_china = "Growth & inflation — China"
 )
 
 # Reference lines drawn on the mini-chart, where a meaningful threshold exists.

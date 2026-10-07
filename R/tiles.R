@@ -312,7 +312,8 @@ regime_headline <- function(df) {
 }
 
 # When the current regime began, the regime before it, and the two readings behind it.
-regime_detail <- function(df) {
+# `price` names the inflation measure (CPI, or HICP for the euro area).
+regime_detail <- function(df, price = "CPI") {
   last <- df[nrow(df), ]
   htmltools::tagList(
     htmltools::div(paste0("Since ", .month_label(last$since),
@@ -320,7 +321,7 @@ regime_detail <- function(df) {
     htmltools::div(class = "text-muted",
       sprintf("Growth: CLI %.2f, %+.2f over 3 months", last$cli, last$growth)),
     htmltools::div(class = "text-muted",
-      sprintf("Inflation: CPI %.2f%%, 12-month average %.2f%%", last$cpi_yoy, last$cpi_avg12)))
+      sprintf("Inflation: %s %.2f%%, 12-month average %.2f%%", price, last$cpi_yoy, last$cpi_avg12)))
 }
 
 # The months a period from `from` to today shows: those whose middle falls inside it,
@@ -339,7 +340,7 @@ regime_detail <- function(df) {
 # and a new period only changes the traces and axis ranges.
 REGIME_FADED <- "#c3c2b7"
 
-regime_quadrant <- function(df, from = NULL) {
+regime_quadrant <- function(df, from = NULL, price = "CPI") {
   d  <- .regime_window(df, from)
   n  <- nrow(d)
   k0 <- max(1, n - 11)                     # first month of the dark stretch
@@ -383,7 +384,7 @@ regime_quadrant <- function(df, from = NULL) {
                    tickfont = .AXIS_FONT, title = list(text = "CLI change over 3 months",
                    font = .AXIS_FONT, standoff = 4)),
       yaxis = list(range = c(-yr, yr), zeroline = FALSE, showgrid = FALSE, nticks = 5,
-                   tickfont = .AXIS_FONT, title = list(text = "CPI vs 12-mo avg, pp",
+                   tickfont = .AXIS_FONT, title = list(text = paste(price, "vs 12-mo avg, pp"),
                    font = .AXIS_FONT, standoff = 4))) |>
     plotly::config(displayModeBar = FALSE, responsive = TRUE)
 }
@@ -446,22 +447,24 @@ regime_key <- function(df, from = NULL) {
     i = round(df$inflation, 4), r = as.integer(df$value), names = REGIMES$name), digits = NA))
 }
 
-# The whole tile body, shared by the app (renderUI) and the static build (static = TRUE
-# strips plotly's raw inputs from the page). `from` is the start of the initial period.
-regime_body <- function(df, frequency, static = FALSE, from = NULL) {
-  fin <- if (static) .static_plot else identity
+# The whole tile body for a registry entry, shared by the app (renderUI) and the static
+# build (static = TRUE strips plotly's raw inputs from the page). `from` is the start of
+# the initial period; the entry's `price_index` names the inflation measure.
+regime_body <- function(df, entry, static = FALSE, from = NULL) {
+  fin   <- if (static) .static_plot else identity
+  price <- entry$price_index %||% "CPI"
   htmltools::tagList(
     # One line of words, a step smaller than the other tiles' figures; on a narrow card
     # the date moves below the headline rather than splitting it.
     htmltools::div(class = "d-flex flex-wrap justify-content-between align-items-baseline",
       htmltools::div(class = "fs-5 fw-semibold text-nowrap me-2", regime_headline(df)),
-      htmltools::div(class = "small text-muted text-nowrap", asof_tag(df, frequency))),
-    htmltools::div(class = "small mb-1", regime_detail(df)),
+      htmltools::div(class = "small text-muted text-nowrap", asof_tag(df, entry$frequency))),
+    htmltools::div(class = "small mb-1", regime_detail(df, price)),
     badge_tag(assess_regime, df),
     htmltools::div(class = "regime-tile",
       htmltools::tags$script(type = "application/json", class = "regime-data",
                              htmltools::HTML(.regime_json(df))),
-      fin(regime_quadrant(df, from)),
+      fin(regime_quadrant(df, from, price)),
       fin(regime_strip(df, from)),
       regime_key(df, from)))
 }

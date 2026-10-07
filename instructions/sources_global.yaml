@@ -106,6 +106,15 @@ series:
   #      handles pick a period, traced on a quadrant above it. `site_from` gives the
   #      public build this tile's full history rather than the page's 5-year window. ----
   - { id: growth_inflation_regime, after: ppi_final_demand, provider: transform, inputs: ["DF_CLI:USA", CPIAUCSL], chart: regime, theme: cycle, indicator_class: leading, frequency: monthly, site_from: "1960-01-01" }
+  # ---- The same regime for the euro area, UK, Japan and China, next to the US tile.
+  #      Growth: the OECD leading indicator (for the euro area, the GDP-weighted average
+  #      of Germany, France, Italy and Spain; the OECD publishes no euro-area indicator).
+  #      Inflation: euro-area HICP (Eurostat), UK CPI (ONS), Japan and China CPI (IMF).
+  #      `price_index` names the inflation measure on the tile. ----
+  - { id: regime_euro_area, after: growth_inflation_regime, provider: transform, inputs: ["DF_CLI:DEU", "DF_CLI:FRA", "DF_CLI:ITA", "DF_CLI:ESP", "Eurostat/nama_10_gdp", "Eurostat/prc_hicp_minr"], chart: regime, price_index: HICP, theme: cycle, indicator_class: leading, frequency: monthly, site_from: "1960-01-01" }
+  - { id: regime_uk, after: regime_euro_area, provider: transform, inputs: ["DF_CLI:GBR", "ONS/MM23/D7G7"], chart: regime, theme: cycle, indicator_class: leading, frequency: monthly, site_from: "1960-01-01" }
+  - { id: regime_japan, after: regime_uk, provider: transform, inputs: ["DF_CLI:JPN", "IMF.STA/CPI/JPN"], chart: regime, theme: cycle, indicator_class: leading, frequency: monthly, site_from: "1960-01-01" }
+  - { id: regime_china, after: regime_japan, provider: transform, inputs: ["DF_CLI:CHN", "IMF.STA/CPI/CHN"], chart: regime, theme: cycle, indicator_class: leading, frequency: monthly, site_from: "1960-01-01" }
 
 # Manifest tiles removed from the dashboard. The global PMI is licensed, and the OECD G20
 # leading indicator (oecd_cli) already covers the global cycle.

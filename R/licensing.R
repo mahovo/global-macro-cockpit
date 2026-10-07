@@ -43,12 +43,21 @@ source_urls_for <- function(entry, lic) {
   trimws(strsplit(r$source_url, ";", fixed = TRUE)[[1]])
 }
 
-#' Attribution for a tile footer, linked to the source page when a series has exactly
-#' one (the IMF's data terms, for example, ask for a link to the dataset).
+#' Attribution for a tile footer, linked to the source page(s) (the IMF's data terms, for
+#' example, ask for a link to the dataset). A series with one source page gets one link.
+#' A derived series whose credit lists one source per page, in order ("Source: A; B;
+#' regime computed by this site" with two pages), links each source to its own page;
+#' any other credit stays plain text.
 attribution_tag <- function(entry, lic) {
   urls <- source_urls_for(entry, lic)
   txt  <- attribution_for(entry, lic)
-  if (length(urls) != 1) return(txt)
-  htmltools::tags$a(href = urls, target = "_blank", rel = "noopener",
-                    class = "link-secondary", txt)
+  link <- function(url, text) htmltools::tags$a(href = url, target = "_blank", rel = "noopener",
+                                                 class = "link-secondary", text)
+  if (length(urls) == 1) return(link(urls, txt))
+  parts <- strsplit(sub("^Source: ", "", txt), "; ", fixed = TRUE)[[1]]
+  note  <- grepl("computed by this site$", parts)
+  if (length(urls) < 2 || !startsWith(txt, "Source: ") || sum(!note) != length(urls)) return(txt)
+  k <- cumsum(!note)
+  htmltools::tagList("Source: ", lapply(seq_along(parts), function(i)
+    htmltools::tagList(if (i > 1) "; ", if (note[i]) parts[i] else link(urls[k[i]], parts[i]))))
 }

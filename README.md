@@ -34,9 +34,10 @@ indicator.
 - **Stocks vs bonds**: expected real returns on equities (the earnings yield) against the
   expected real yield on 10-year Treasuries, after Ray Dalio — the tile warns when the two
   lines near crossing.
-- **Growth & inflation regime**: which of Dalio's four economic environments the US is in
-  (growth rising or falling, crossed with inflation rising or falling), from the OECD
-  leading indicator and CPI: a strip of past regimes (back to 1960 on the public site)
+- **Growth & inflation regimes**: which of Dalio's four economic environments the US, the
+  euro area, the UK, Japan and China are in (growth rising or falling, crossed with
+  inflation rising or falling), from the OECD leading indicators and headline inflation:
+  for each, a strip of past regimes (back to 1960 on the public site, where the data allow)
   whose handles pick a period, traced on a quadrant.
 
 ## Two editions
