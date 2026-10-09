@@ -86,7 +86,7 @@ view_panel <- function(view) {
       sprintf("Cockpit zone: %s", view$zone),
       if (pending > 0) span(class = "ms-2", sprintf("· %d source(s) pending", pending))),
     div(class = "border-start border-3 ps-2 mb-3 mt-1 text-body-secondary small",
-        style = "max-width: 900px;", view_help(view$id)),
+        style = "max-width: 900px;", view_help(view$id), " ", guide_link(paste0("tab-", view$id))),
     if (length(tiles))
       do.call(layout_column_wrap, c(list(width = "330px", heights_equal = "row"), tiles))
     else div(class = "text-muted py-4", "All sources for this view are pending.")
@@ -100,6 +100,7 @@ ui <- page_sidebar(
   fillable = FALSE,
   sidebar = sidebar(
     width = 300,
+    div(class = "small", guide_link(text = "User guide ›")),
     dateInput("start_date", "Show history since",
       value = Sys.Date() - 365 * 3, max = Sys.Date(), weekstart = 1),
     radioButtons("view_mode", "Display mode",
@@ -130,7 +131,7 @@ ui <- page_sidebar(
       "Co-written by Claude Code Opus 5", br(), "Directed by Martin Hoshi Vognsen")
   ),
   do.call(navset_tab, lapply(VIEWS, view_panel)),
-  ESC_DISMISS_JS,
+  POPOVER_JS,
   REGIME_JS
 )
 
@@ -174,7 +175,7 @@ server <- function(input, output, session) {
 
     output[[paste0("val_", id)]]   <- renderText(value_label(dr(), input$view_mode, unit))
     output[[paste0("asof_", id)]]  <- renderUI(asof_tag(dr(), ent$frequency))
-    output[[paste0("chg_", id)]]   <- renderUI(change_tag(dr(), input$view_mode))
+    output[[paste0("chg_", id)]]   <- renderUI(change_tag(dr(), input$view_mode, unit))
     output[[paste0("badge_", id)]] <- renderUI(badge_tag(ass, dr()))   # reads the level
     if (identical(ent$chart, "pair")) output[[paste0("detail_", id)]] <- renderUI({
       raw <- dr()

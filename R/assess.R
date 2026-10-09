@@ -2,142 +2,163 @@
 # frame to list(text, tone) with tone in good/warn/bad/neutral. Only series with
 # a meaningful threshold get an assessor; the rest render value + chart with no
 # badge (we don't fabricate thresholds).
+#
+# The thresholds are data (BADGE_BANDS and BADGE_PARAMS below), read both by the
+# assessors and by the user guide (scripts/build_guide.R), so the guide quotes exactly
+# what the badges do.
 
 .last <- function(df) if (!is.null(df) && nrow(df)) dplyr::last(df$value) else NA_real_
 .prev <- function(df) if (!is.null(df) && nrow(df) > 1) df$value[nrow(df) - 1] else NA_real_
+.no_data <- list(text = "No data", tone = "neutral")
 
-assess_curve <- function(df) {
-  v <- .last(df)
-  if (is.na(v))     list(text = "No data", tone = "neutral")
-  else if (v < 0)   list(text = "Inverted — recession lead", tone = "bad")
-  else if (v < 0.5) list(text = "Flat — late-cycle", tone = "warn")
-  else              list(text = "Positively sloped", tone = "good")
+# --- badge rules -------------------------------------------------------------
+# Band rules read the latest value: the first row whose condition `value <op> at` holds
+# gives the badge; the last row (op NA) is the fallback.
+.bands <- function(...) {
+  r <- matrix(c(...), ncol = 4, byrow = TRUE)
+  data.frame(op = r[, 1], at = suppressWarnings(as.numeric(r[, 2])), text = r[, 3],
+             tone = r[, 4], stringsAsFactors = FALSE)
 }
 
-assess_hy <- function(df) {
-  v <- .last(df)
-  if (is.na(v))    list(text = "No data", tone = "neutral")
-  else if (v < 3)  list(text = "Tight — risk-on", tone = "neutral")
-  else if (v < 5)  list(text = "Normal range", tone = "good")
-  else if (v < 8)  list(text = "Elevated stress", tone = "warn")
-  else             list(text = "Stressed — risk-off", tone = "bad")
+BADGE_BANDS <- list(
+  curve = .bands(                          # yield-curve spread, pp
+    "<",  0,   "Inverted — recession lead", "bad",
+    "<",  0.5, "Flat — late-cycle",         "warn",
+    NA,   NA,  "Positively sloped",         "good"),
+  hy = .bands(                             # credit spread (OAS), %
+    "<",  3,   "Tight — risk-on",           "neutral",
+    "<",  5,   "Normal range",              "good",
+    "<",  8,   "Elevated stress",           "warn",
+    NA,   NA,  "Stressed — risk-off",       "bad"),
+  hy_ig = .bands(                          # HY minus IG spread, pp
+    "<",  2,   "Compressed — complacent",   "neutral",
+    "<",  3.5, "Normal range",              "good",
+    "<",  5,   "Decompressing",             "warn",
+    NA,   NA,  "Wide — risk-off",           "bad"),
+  nfci = .bands(                           # 0 = average; positive = tighter than average
+    ">",  0.5, "Tight — headwind",          "bad",
+    ">",  0,   "Slightly tight",            "warn",
+    NA,   NA,  "Loose — tailwind",          "good"),
+  sahm = .bands(                           # >= 0.5 triggers the Sahm recession rule
+    ">=", 0.5, "Triggered — recession",     "bad",
+    ">=", 0.3, "Rising — watch",            "warn",
+    NA,   NA,  "Below trigger",             "good"),
+  recprob = .bands(                        # smoothed recession probability, %
+    ">=", 50,  "High probability",          "bad",
+    ">=", 20,  "Elevated",                  "warn",
+    NA,   NA,  "Low",                       "good"),
+  breakeven = .bands(                      # CPI breakeven, %
+    "<",  1.8, "Low — disinflation",        "warn",
+    "<=", 2.7, "Anchored",                  "good",
+    "<=", 3.2, "Elevated",                  "warn",
+    NA,   NA,  "High — inflation risk",     "bad"),
+  vix = .bands(
+    ">=", 30,  "Fear — stress",             "bad",
+    ">=", 20,  "Elevated",                  "warn",
+    NA,   NA,  "Calm",                      "good"),
+  buffett = .bands(                        # corporate equity / GDP ratio
+    ">=", 2,   "Very stretched",            "bad",
+    ">=", 1.5, "Elevated",                  "warn",
+    NA,   NA,  "Moderate",                  "neutral"),
+  cpi = .bands(                            # year-over-year inflation rate, %
+    "<",  0,   "Deflation",                 "bad",
+    "<",  1,   "Below target",              "warn",
+    "<=", 2.5, "Near target",               "good",
+    "<=", 4,   "Above target",              "warn",
+    NA,   NA,  "High",                      "bad"),
+  stocks_bonds = .bands(                   # earnings yield minus real 10Y yield, pp
+    "<",  0,   "Crossed — bonds out-yield stocks", "bad",
+    "<",  1,   "Close to crossing",         "warn",
+    NA,   NA,  "Stocks out-yield bonds",    "good"),
+  cpi_india = .bands(                      # RBI target: 4% CPI inflation, tolerance band 2-6%
+    "<",  2,   "Below the RBI band",        "warn",
+    "<=", 6,   "Within the RBI band",       "good",
+    NA,   NA,  "Above the RBI band",        "bad"),
+  gscpi = .bands(                          # standard deviations from the historical average
+    ">=", 2,   "Severe pressure",           "bad",
+    ">=", 1,   "Elevated pressure",         "warn",
+    ">=", -1,  "Normal range",              "good",
+    NA,   NA,  "Slack",                     "neutral")
+)
+
+# Parameters of the rules that aren't bands (see each assessor).
+BADGE_PARAMS <- list(
+  claims  = list(window = 52, rise = 15),        # % rise off the low of the last `window` obs
+  cli     = list(trend = 100),                   # long-term trend of an OECD CLI
+  copper  = list(lag = 3, band = 1),             # % change over `lag` obs; flat within ±band
+  stocks_bonds_history = list(near = 2, narrow = 10, narrower = 25)   # percentile of the gap
+)
+
+.band_badge <- function(set, v) {
+  r <- BADGE_BANDS[[set]]
+  for (i in seq_len(nrow(r))) {
+    if (is.na(r$op[i]) || match.fun(r$op[i])(v, r$at[i])) return(list(text = r$text[i], tone = r$tone[i]))
+  }
 }
 
-assess_hy_ig <- function(df) {
-  v <- .last(df)
-  if (is.na(v))      list(text = "No data", tone = "neutral")
-  else if (v < 2)    list(text = "Compressed — complacent", tone = "neutral")
-  else if (v < 3.5)  list(text = "Normal range", tone = "good")
-  else if (v < 5)    list(text = "Decompressing", tone = "warn")
-  else               list(text = "Wide — risk-off", tone = "bad")
+#' Assessor reading the latest value against a band rule set.
+assess_bands <- function(set) {
+  force(set)
+  function(df) { v <- .last(df); if (is.na(v)) .no_data else .band_badge(set, v) }
 }
 
-assess_nfci <- function(df) {           # 0 = average; positive = tighter than average
-  v <- .last(df)
-  if (is.na(v))      list(text = "No data", tone = "neutral")
-  else if (v > 0.5)  list(text = "Tight — headwind", tone = "bad")
-  else if (v > 0)    list(text = "Slightly tight", tone = "warn")
-  else               list(text = "Loose — tailwind", tone = "good")
-}
-
-assess_sahm <- function(df) {           # >= 0.5 triggers the Sahm recession rule
-  v <- .last(df)
-  if (is.na(v))       list(text = "No data", tone = "neutral")
-  else if (v >= 0.5)  list(text = "Triggered — recession", tone = "bad")
-  else if (v >= 0.3)  list(text = "Rising — watch", tone = "warn")
-  else                list(text = "Below trigger", tone = "good")
-}
-
-assess_recprob <- function(df) {        # smoothed recession probability, %
-  v <- .last(df)
-  if (is.na(v))      list(text = "No data", tone = "neutral")
-  else if (v >= 50)  list(text = "High probability", tone = "bad")
-  else if (v >= 20)  list(text = "Elevated", tone = "warn")
-  else               list(text = "Low", tone = "good")
-}
+assess_curve        <- assess_bands("curve")
+assess_hy           <- assess_bands("hy")
+assess_hy_ig        <- assess_bands("hy_ig")
+assess_nfci         <- assess_bands("nfci")
+assess_sahm         <- assess_bands("sahm")
+assess_recprob      <- assess_bands("recprob")
+assess_breakeven    <- assess_bands("breakeven")
+assess_vix          <- assess_bands("vix")
+assess_buffett      <- assess_bands("buffett")
+assess_cpi          <- assess_bands("cpi")
+assess_stocks_bonds <- assess_bands("stocks_bonds")
+assess_gscpi        <- assess_bands("gscpi")
+assess_cpi_india    <- assess_bands("cpi_india")
 
 assess_claims <- function(df) {         # rising off lows = softening labour
-  if (is.null(df) || nrow(df) < 5) return(list(text = "No data", tone = "neutral"))
-  v  <- .last(df); lo <- min(utils::tail(df$value, 52), na.rm = TRUE)
-  if ((v - lo) / lo > 0.15) list(text = "Rising off lows", tone = "warn")
-  else                      list(text = "Near lows — firm", tone = "good")
+  p <- BADGE_PARAMS$claims
+  if (is.null(df) || nrow(df) < 5) return(.no_data)
+  v  <- .last(df); lo <- min(utils::tail(df$value, p$window), na.rm = TRUE)
+  if (100 * (v - lo) / lo > p$rise) list(text = "Rising off lows", tone = "warn")
+  else                              list(text = "Near lows — firm", tone = "good")
 }
 
 assess_cli <- function(df) {            # 100 = trend
+  trend <- BADGE_PARAMS$cli$trend
   v <- .last(df); p <- .prev(df)
-  if (is.na(v) || is.na(p)) return(list(text = "No data", tone = "neutral"))
+  if (is.na(v) || is.na(p)) return(.no_data)
   rising <- v >= p
-  if (v >= 100 && rising) list(text = "Above trend & rising", tone = "good")
-  else if (v >= 100)      list(text = "Above trend, slowing", tone = "warn")
-  else if (rising)        list(text = "Below trend, recovering", tone = "warn")
-  else                    list(text = "Below trend & falling", tone = "bad")
-}
-
-assess_breakeven <- function(df) {      # 10y CPI breakeven, %
-  v <- .last(df)
-  if (is.na(v))       list(text = "No data", tone = "neutral")
-  else if (v < 1.8)   list(text = "Low — disinflation", tone = "warn")
-  else if (v <= 2.7)  list(text = "Anchored", tone = "good")
-  else if (v <= 3.2)  list(text = "Elevated", tone = "warn")
-  else                list(text = "High — inflation risk", tone = "bad")
-}
-
-assess_vix <- function(df) {
-  v <- .last(df)
-  if (is.na(v))       list(text = "No data", tone = "neutral")
-  else if (v >= 30)   list(text = "Fear — stress", tone = "bad")
-  else if (v >= 20)   list(text = "Elevated", tone = "warn")
-  else                list(text = "Calm", tone = "good")
-}
-
-assess_buffett <- function(df) {        # corporate equity / GDP ratio
-  v <- .last(df)
-  if (is.na(v))      list(text = "No data", tone = "neutral")
-  else if (v >= 2)   list(text = "Very stretched", tone = "bad")
-  else if (v >= 1.5) list(text = "Elevated", tone = "warn")
-  else               list(text = "Moderate", tone = "neutral")
-}
-
-assess_cpi <- function(df) {            # year-over-year inflation rate, %
-  v <- .last(df)
-  if (is.na(v))      list(text = "No data", tone = "neutral")
-  else if (v < 0)    list(text = "Deflation", tone = "bad")
-  else if (v < 1)    list(text = "Below target", tone = "warn")
-  else if (v <= 2.5) list(text = "Near target", tone = "good")
-  else if (v <= 4)   list(text = "Above target", tone = "warn")
-  else               list(text = "High", tone = "bad")
+  if (v >= trend && rising) list(text = "Above trend & rising", tone = "good")
+  else if (v >= trend)      list(text = "Above trend, slowing", tone = "warn")
+  else if (rising)          list(text = "Below trend, recovering", tone = "warn")
+  else                      list(text = "Below trend & falling", tone = "bad")
 }
 
 assess_copper <- function(df) {         # 3-month momentum
-  if (is.null(df) || nrow(df) < 4) return(list(text = "No data", tone = "neutral"))
-  v <- .last(df); ago <- df$value[nrow(df) - 3]
+  p <- BADGE_PARAMS$copper
+  if (is.null(df) || nrow(df) < p$lag + 1) return(.no_data)
+  v <- .last(df); ago <- df$value[nrow(df) - p$lag]
   chg <- (v / ago - 1) * 100
-  if (chg > 1)       list(text = "Rising — demand firm", tone = "good")
-  else if (chg < -1) list(text = "Falling — softening", tone = "warn")
-  else               list(text = "Flat", tone = "neutral")
-}
-
-assess_stocks_bonds <- function(df) {   # earnings yield minus real 10Y yield, pp
-  v <- .last(df)
-  if (is.na(v))     list(text = "No data", tone = "neutral")
-  else if (v < 0)   list(text = "Crossed — bonds out-yield stocks", tone = "bad")
-  else if (v < 1)   list(text = "Close to crossing", tone = "warn")
-  else              list(text = "Stocks out-yield bonds", tone = "good")
+  if (chg > p$band)       list(text = "Rising — demand firm", tone = "good")
+  else if (chg < -p$band) list(text = "Falling — softening", tone = "warn")
+  else                    list(text = "Flat", tone = "neutral")
 }
 
 # Euro-area and UK stocks vs bonds: their levels aren't comparable with the US tile's, so
 # each is read against its own history (`gap_rank`, `hist_from`: see R/fetch.R); only a
 # negative gap is read absolutely.
 assess_stocks_bonds_history <- function(df) {
+  p <- BADGE_PARAMS$stocks_bonds_history
   v <- .last(df)
-  if (is.na(v)) return(list(text = "No data", tone = "neutral"))
+  if (is.na(v)) return(.no_data)
   r    <- df$gap_rank[nrow(df)]
   from <- format(df$hist_from[nrow(df)], "%Y")
-  if (v < 0)        list(text = "Crossed — bonds out-yield stocks", tone = "bad")
-  else if (r <= 2)  list(text = paste("Near its narrowest since", from), tone = "warn")
-  else if (r <= 10) list(text = paste("Narrow: bottom 10% since", from), tone = "warn")
-  else if (r <= 25) list(text = "Narrower than usual", tone = "warn")
-  else              list(text = "Usual range or wider", tone = "good")
+  if (v < 0)               list(text = "Crossed — bonds out-yield stocks", tone = "bad")
+  else if (r <= p$near)    list(text = paste("Near its narrowest since", from), tone = "warn")
+  else if (r <= p$narrow)  list(text = paste0("Narrow: bottom ", p$narrow, "% since ", from), tone = "warn")
+  else if (r <= p$narrower) list(text = "Narrower than usual", tone = "warn")
+  else                     list(text = "Usual range or wider", tone = "good")
 }
 
 # Growth/inflation regimes (after Ray Dalio's four environments), indexed by the code
@@ -153,23 +174,14 @@ REGIMES <- data.frame(
 
 assess_regime <- function(df) {
   v <- .last(df)
-  if (is.na(v)) list(text = "No data", tone = "neutral")
+  if (is.na(v)) .no_data
   else          list(text = REGIMES$name[v], tone = REGIMES$tone[v])
-}
-
-assess_gscpi <- function(df) {          # standard deviations from the historical average
-  v <- .last(df)
-  if (is.na(v))      list(text = "No data", tone = "neutral")
-  else if (v >= 2)   list(text = "Severe pressure", tone = "bad")
-  else if (v >= 1)   list(text = "Elevated pressure", tone = "warn")
-  else if (v >= -1)  list(text = "Normal range", tone = "good")
-  else               list(text = "Slack", tone = "neutral")
 }
 
 # series_id -> assessor
 ASSESSORS <- list(
   curve_10y_3m = assess_curve, curve_10y_2y = assess_curve,
-  hy_oas = assess_hy, ig_oas = assess_hy, hy_minus_ig = assess_hy_ig,
+  hy_oas = assess_hy, hy_minus_ig = assess_hy_ig,   # no IG badge: the HY bands don't fit IG spreads
   nfci = assess_nfci, anfci = assess_nfci,
   sahm_realtime = assess_sahm, recession_prob_chauvet_piger = assess_recprob,
   initial_claims = assess_claims, continuing_claims = assess_claims,
@@ -181,8 +193,9 @@ ASSESSORS <- list(
   cli_g7 = assess_cli, cli_uk = assess_cli, cli_japan = assess_cli, cli_germany = assess_cli,
   cli_china = assess_cli, cli_india = assess_cli, cli_korea = assess_cli, cli_brazil = assess_cli,
   hicp_ea = assess_cpi, hicp_eu = assess_cpi, hicp_de = assess_cpi, hicp_fr = assess_cpi,
+  cpi_headline = assess_cpi, cpi_core = assess_cpi, pce_core = assess_cpi,
   # global (G2)
-  cpi_uk = assess_cpi, cpi_japan = assess_cpi, cpi_china = assess_cpi, cpi_india = assess_cpi,
+  cpi_uk = assess_cpi, cpi_japan = assess_cpi, cpi_india = assess_cpi_india,   # China: no verified target, no badge
   # free replacements for licensed manual tiles
   cli_usa = assess_cli, gscpi = assess_gscpi, stocks_vs_bonds_real = assess_stocks_bonds,
   stocks_vs_bonds_euro_area = assess_stocks_bonds_history, stocks_vs_bonds_uk = assess_stocks_bonds_history,

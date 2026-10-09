@@ -66,6 +66,23 @@
     dplyr::filter(!is.na(value))
 }
 
+# Inflation year on year from the published months of a monthly price index only: a month
+# with no published index (US CPI for October 2025) gets no value, nor does the month a year
+# after it. The regime tiles use .yoy_from_index above instead, which fills such a month in.
+.yoy_published <- function(idx) {
+  ago <- as.Date(sprintf("%d-%s", as.integer(format(idx$date, "%Y")) - 1, format(idx$date, "%m-%d")))
+  tibble::tibble(date = idx$date, value = 100 * (idx$value / idx$value[match(ago, idx$date)] - 1)) |>
+    dplyr::filter(!is.na(value)) |>
+    dplyr::arrange(date)
+}
+
+# Fetch closure for a tile that shows a monthly FRED price index as inflation, % over 12 months.
+.yoy_tile <- function(series_id) {
+  list(access = "transform", fetch = function(start, end, ttl)
+    dplyr::filter(.yoy_published(fred_series(series_id, as.Date(start) - 400, end, ttl = ttl)),
+                  date >= as.Date(start)))
+}
+
 # Euro-area leading indicator. The OECD publishes none, so this averages the OECD
 # indicators for the four largest euro economies, weighted by their nominal GDP in the
 # latest year Eurostat has for all four, over the months all four indicators cover.
@@ -140,14 +157,16 @@ ENTRY_OVERRIDES <- list(
     access = "sdmx",
     fetch  = function(start, end, ttl) oecd_cli("G20", start, end)
   ),
-  # Net liquidity = WALCL − TGA − RRP, but WALCL/WTREGEN are in $millions while
+  # Net liquidity = WALCL − TGA − RRP, but WALCL/WDTGAL are in $millions while
   # RRPONTSYD is in $billions — so RRP must be scaled ×1000 before subtracting
   # (the naive formula under-drains by up to ~$2.5T historically). Result in $M.
+  # The TGA is its Wednesday level (WDTGAL), matching WALCL's timing; the TGA tile
+  # itself shows the week average (WTREGEN).
   net_liquidity = list(
     access = "transform",
     fetch  = function(start, end, ttl) {
       wal <- fred_series("WALCL",     as.Date(start) - 30, end, ttl = ttl)
-      tga <- fred_series("WTREGEN",   as.Date(start) - 30, end, ttl = ttl)
+      tga <- fred_series("WDTGAL",    as.Date(start) - 30, end, ttl = ttl)
       rrp <- fred_series("RRPONTSYD", as.Date(start) - 30, end, ttl = ttl)
       rrp$value <- rrp$value * 1000   # $billions -> $millions
       wide <- .align_locf(list(WALCL = wal, TGA = tga, RRP = rrp), c("WALCL", "TGA", "RRP"))
@@ -156,6 +175,34 @@ ENTRY_OVERRIDES <- list(
         dplyr::arrange(date)
     }
   ),
+  # M2 growth year on year (%), from the monthly level (M2SL); the money stock is read by
+  # its growth, so the tile shows that rather than the level.
+  m2 = list(
+    access = "transform",
+    fetch  = function(start, end, ttl)
+      dplyr::filter(.yoy_from_index(fred_series("M2SL", as.Date(start) - 400, end, ttl = ttl)),
+                    date >= as.Date(start))
+  ),
+  # US price indices shown as inflation over 12 months (%), from published months only.
+  cpi_headline     = .yoy_tile("CPIAUCSL"),
+  cpi_core         = .yoy_tile("CPILFESL"),
+  pce_core         = .yoy_tile("PCEPILFE"),
+  ppi_final_demand = .yoy_tile("PPIFIS"),
+  # Nonfarm payrolls as BLS reports them: the change from the previous month, in thousands
+  # (consecutive published months only).
+  nonfarm_payrolls = list(access = "transform", fetch = function(start, end, ttl) {
+    p <- fred_series("PAYEMS", as.Date(start) - 62, end, ttl = ttl)
+    before <- as.Date(vapply(p$date, function(d) format(seq(d, by = "-1 month", length.out = 2)[2]), ""))
+    tibble::tibble(date = p$date, value = p$value - p$value[match(before, p$date)]) |>
+      dplyr::filter(!is.na(value), date >= as.Date(start)) |>
+      dplyr::arrange(date)
+  }),
+  # Core capital goods orders and industrial production, % change over 12 months.
+  core_capex_orders     = .yoy_tile("NEWORDER"),
+  # Real retail and food services sales (St. Louis Fed: Census advance sales deflated by CPI;
+  # the id is historical, this is not the control group), % change over 12 months.
+  retail_sales_control_group = .yoy_tile("RRSFS"),
+  industrial_production = .yoy_tile("INDPRO"),
   # ECB deposit facility rate from the ECB Data Portal (verified series key). The
   # DBnomics copy used before lagged the source by weeks and missed rate changes.
   ecb_policy_rate = list(
@@ -276,7 +323,7 @@ ENTRY_OVERRIDES <- list(
     yoy = function(from, end, ttl) .yoy_from_index(fred_series("CPIAUCSL", from, end, ttl = ttl)))),
   regime_euro_area = list(access = "transform", fetch = .regime_fetch(
     cli = .cli_euro_area,
-    yoy = function(from, end, ttl) eurostat_series("prc_hicp_minr", "M.RCH_A.TOTAL.EA20", from, end, ttl))),
+    yoy = function(from, end, ttl) eurostat_series("prc_hicp_minr", "M.RCH_A.TOTAL.EA", from, end, ttl))),
   regime_uk = list(access = "transform", fetch = .regime_fetch(
     cli = function(from, end, ttl) oecd_cli("GBR", from, end),
     yoy = function(from, end, ttl)

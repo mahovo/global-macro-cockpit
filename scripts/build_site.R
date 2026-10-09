@@ -39,6 +39,7 @@ USES_API <- nzchar(fred_api_key())
 DOT      <- intToUtf8(0xB7)     # middle dot
 ARROW    <- intToUtf8(0x203A)   # single right-pointing angle quotation mark
 REG      <- intToUtf8(0xAE)     # registered sign
+GUIDE_URL <- "guide/"           # the user guide sits beside this page (scripts/build_guide.R)
 
 if (nzchar(Sys.getenv("CI")) && !USES_API) {
   stop("FRED_API_KEY must be set for the automated build (add it as a repository secret).",
@@ -104,7 +105,7 @@ data_card <- function(e, df) {
     div(class = "d-flex justify-content-between align-items-baseline",
       div(class = "fs-4 fw-semibold", mode_parts(function(m) value_label(df, m, unit))),
       div(class = "small text-muted text-nowrap ms-2", asof_tag(df, e$frequency))),
-    div(class = "small mb-1", mode_parts(function(m) change_tag(df, m)),
+    div(class = "small mb-1", mode_parts(function(m) change_tag(df, m, unit)),
         if (pair) mode_parts(function(m) pair_detail(df, m, tone))),
     badge_tag(ass, df),
     if (pair) spark_plot_pair_modes(df, tone)
@@ -151,7 +152,7 @@ view_panel <- function(view) {
     div(class = "text-muted small mt-2", sprintf("Cockpit zone: %s", view$zone),
         if (pending > 0) span(class = "ms-2", sprintf("%s %d source(s) pending", DOT, pending))),
     div(class = "border-start border-3 ps-2 mb-3 mt-1 text-body-secondary small",
-        style = "max-width: 900px;", view_help(view$id)),
+        style = "max-width: 900px;", view_help(view$id), " ", guide_link(paste0("tab-", view$id))),
     if (length(shown))
       do.call(layout_column_wrap,
               c(list(width = "330px", heights_equal = "row"), lapply(shown, card_for)))
@@ -195,6 +196,7 @@ side <- sidebar(
   div(class = "small text-muted edition-note",
       "Static public edition of a private dashboard",
       help_popover("About this edition", ABOUT, placement = "bottom")),
+  div(class = "small", guide_link(text = paste("User guide", ARROW))),
   div(tags$label(class = "form-label small fw-semibold mb-1", "Display mode"),
       radio_group("mode", c("Level" = "level", "Z-score" = "z", "Percentile" = "pct"), "level")),
   div(tags$label(class = "form-label small fw-semibold mb-1", "Zoom"),
@@ -403,7 +405,7 @@ page <- page_sidebar(
   ),
   do.call(navset_tab, lapply(VIEWS, view_panel)),
   footer,
-  ESC_DISMISS_JS,
+  POPOVER_JS,
   REGIME_JS,
   tags$script(HTML(JS))
 )

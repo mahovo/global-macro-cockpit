@@ -24,15 +24,30 @@ TITLE_OVERRIDES <- list(
   hy_oas = "HY credit spread (OAS)", ig_oas = "IG credit spread (OAS)",
   hy_minus_ig = "HY − IG (decompression)", nfci = "Financial conditions (NFCI)",
   anfci = "Adjusted NFCI", net_liquidity = "Net liquidity (Fed − TGA − RRP)",
-  oecd_cli = "OECD CLI (G20)", sahm_realtime = "Sahm rule (real-time)",
-  recession_prob_chauvet_piger = "Recession probability", initial_claims = "Initial jobless claims",
-  continuing_claims = "Continuing claims", breakeven_10y = "10Y inflation breakeven",
+  oecd_cli = "OECD CLI — G20", sahm_realtime = "Sahm rule (real-time)",
+  recession_prob_chauvet_piger = "Recession probability", initial_claims = "Initial jobless claims — US",
+  continuing_claims = "Continuing claims — US", breakeven_10y = "10Y inflation breakeven",
   breakeven_5y = "5Y inflation breakeven", breakeven_5y5y_fwd = "5y5y forward breakeven",
   copper_global = "Copper price", broad_usd = "Broad US dollar", vix = "VIX",
-  sp500 = "S&P 500", real_10y_yield = "Real 10Y yield", ecb_policy_rate = "ECB deposit rate",
-  case_shiller_price_rent = "Case-Shiller price/rent", building_permits = "Building permits",
+  sp500 = "S&P 500", real_10y_yield = "Real 10Y yield — US", ecb_policy_rate = "ECB deposit rate",
+  case_shiller_price_rent = "Case-Shiller price/rent — US", building_permits = "Building permits",
   housing_starts = "Housing starts", umich_sentiment = "UMich consumer sentiment",
-  buffett_indicator = "Equity / GDP (Buffett)",
+  buffett_indicator = "Equity / GDP (Buffett) — US",
+  stl_financial_stress = "St. Louis Fed financial stress", fed_balance_sheet = "Fed balance sheet",
+  reverse_repo = "Overnight reverse repo", m2 = "M2 growth (year on year)",
+  sloos_ci_tightening = "C&I lending standards (SLOOS)", ust_3m = "3M Treasury yield",
+  ust_2y = "2Y Treasury yield", ust_10y = "10Y Treasury yield", effr = "Fed funds rate (effective)",
+  empire_state_mfg = "Empire State manufacturing", philly_fed_mfg = "Philadelphia Fed manufacturing",
+  industrial_production = "Industrial production — US", real_gdp = "Real GDP — US",
+  jolts_quits_rate = "Quits rate (JOLTS) — US", jolts_openings = "Job openings (JOLTS) — US",
+  temp_help_employment = "Temp-help employment — US", avg_weekly_hours_mfg = "Manufacturing hours — US",
+  nonfarm_payrolls = "Nonfarm payrolls — US", unemployment_rate = "Unemployment rate — US",
+  brent = "Brent crude oil", wti = "WTI crude oil — US", henry_hub_gas = "Henry Hub natural gas — US",
+  retail_sales_control_group = "Real retail sales — US",
+  epu_us_daily = "Policy uncertainty — US (daily)", epu_global = "Policy uncertainty — Global",
+  household_debt_service_ratio = "Household debt service — US",
+  cpi_headline = "CPI inflation — US", cpi_core = "Core CPI inflation — US",
+  pce_core = "Core PCE inflation — US", ppi_final_demand = "PPI final demand inflation — US", umich_inflation_exp_1y = "1Y expected inflation (UMich)",
   # global (G1)
   ea_10y = "10Y yield — Euro area", de_10y = "10Y yield — Germany",
   fr_10y = "10Y yield — France", it_10y = "10Y yield — Italy",
@@ -40,22 +55,22 @@ TITLE_OVERRIDES <- list(
   cli_g7 = "OECD CLI — G7", cli_uk = "OECD CLI — UK", cli_japan = "OECD CLI — Japan",
   cli_germany = "OECD CLI — Germany", cli_china = "OECD CLI — China",
   cli_india = "OECD CLI — India", cli_korea = "OECD CLI — Korea", cli_brazil = "OECD CLI — Brazil",
-  unemp_uk = "Unemployment — UK", unemp_japan = "Unemployment — Japan",
-  unemp_germany = "Unemployment — Germany",
+  unemp_uk = "Unemployment rate — UK", unemp_japan = "Unemployment rate — Japan",
+  unemp_germany = "Unemployment rate — Germany",
   hicp_ea = "HICP inflation — Euro area", hicp_eu = "HICP inflation — EU",
-  hicp_de = "HICP — Germany", hicp_fr = "HICP — France",
+  hicp_de = "HICP inflation — Germany", hicp_fr = "HICP inflation — France",
   # global (G2)
   rate_3m_euro = "3M govt yield — Euro area (AAA)", rate_3m_uk = "SONIA — UK",
   rate_3m_japan = "Overnight call rate — Japan", rate_3m_canada = "3M rate — Canada",
   cpi_uk = "CPI inflation — UK", cpi_japan = "CPI inflation — Japan",
   cpi_china = "CPI inflation — China", cpi_india = "CPI inflation — India",
   pmi_euro = "PMI — Euro area", pmi_uk = "PMI — UK", pmi_japan = "PMI — Japan",
-  pmi_china = "PMI — China (Caixin)", pmi_india = "PMI — India",
+  pmi_china = "PMI — China", pmi_india = "PMI — India",
   # free replacements for licensed manual tiles
-  ust10y_realized_vol = "10Y Treasury volatility (realized)", core_capex_orders = "Core capital goods orders",
-  cli_usa = "OECD CLI — US", gscpi = "Global supply chain pressure (NY Fed)",
+  ust10y_realized_vol = "10Y Treasury volatility (realized)", core_capex_orders = "Core capital goods orders — US",
+  cli_usa = "OECD CLI — US", gscpi = "Global supply chain pressure",
   new_home_sales = "New home sales", mortgage_rate_30y = "30Y mortgage rate",
-  ipo_spac_issuance = "IPO & SPAC issuance",
+  ipo_spac_issuance = "IPO & SPAC issuance — US",
   stocks_vs_bonds_real = "Stocks vs bonds — US", stocks_vs_bonds_euro_area = "Stocks vs bonds — Euro area",
   stocks_vs_bonds_uk = "Stocks vs bonds — UK",
   growth_inflation_regime = "Growth & inflation — US", regime_euro_area = "Growth & inflation — Euro area",
@@ -71,8 +86,11 @@ REF_LINES <- list(
   cli_g7 = 100, cli_uk = 100, cli_japan = 100, cli_germany = 100,
   cli_china = 100, cli_india = 100, cli_korea = 100, cli_brazil = 100,
   hicp_ea = 2, hicp_eu = 2, hicp_de = 2, hicp_fr = 2,
-  cpi_uk = 2, cpi_japan = 2, cpi_china = 2, cpi_india = 2,
-  cli_usa = 100, gscpi = 0
+  cpi_uk = 2, cpi_japan = 2, cpi_india = 4,
+  cli_usa = 100, gscpi = 0, stl_financial_stress = 0, m2 = 0,
+  cpi_headline = 2, cpi_core = 2, pce_core = 2,
+  empire_state_mfg = 0, philly_fed_mfg = 0, core_capex_orders = 0, industrial_production = 0, real_gdp = 0,
+  nonfarm_payrolls = 0, retail_sales_control_group = 0
 )
 
 # Short unit suffixes for the value headline. "k" = thousands (FRED convention
@@ -88,15 +106,15 @@ UNITS <- list(
   unemployment_rate = "%", household_debt_service_ratio = "%",
   # dollar levels
   fed_balance_sheet = "$M", treasury_general_account = "$M", net_liquidity = "$M",
-  retail_sales_control_group = "$M", reverse_repo = "$B", m2 = "$B", real_gdp = "$B",
+  retail_sales_control_group = "%", reverse_repo = "$B", m2 = "%", real_gdp = "%",
   # counts (thousands) / hours
   jolts_openings = "k", temp_help_employment = "k", nonfarm_payrolls = "k",
   building_permits = "k", housing_starts = "k", avg_weekly_hours_mfg = "hrs",
   # prices
   copper_global = "USD/t", brent = "USD/bbl", wti = "USD/bbl", henry_hub_gas = "USD/MMBtu",
   # indices
-  cpi_headline = "index", cpi_core = "index", pce_core = "index", ppi_final_demand = "index",
-  industrial_production = "index", umich_sentiment = "index", broad_usd = "index",
+  cpi_headline = "%", cpi_core = "%", pce_core = "%", ppi_final_demand = "%",
+  industrial_production = "%", umich_sentiment = "index", broad_usd = "index",
   epu_us_daily = "index", epu_global = "index",
   # ratio
   buffett_indicator = "x",
@@ -108,7 +126,7 @@ UNITS <- list(
   rate_3m_euro = "%", rate_3m_uk = "%", rate_3m_japan = "%", rate_3m_canada = "%",
   cpi_uk = "%", cpi_japan = "%", cpi_china = "%", cpi_india = "%",
   # free replacements for licensed manual tiles
-  ust10y_realized_vol = "bp", core_capex_orders = "$M", new_home_sales = "k",
+  ust10y_realized_vol = "bp", core_capex_orders = "%", new_home_sales = "k",
   mortgage_rate_30y = "%", gscpi = "σ", stocks_vs_bonds_real = "pp", stocks_vs_bonds_euro_area = "pp",
   stocks_vs_bonds_uk = "pp"
 )
@@ -129,19 +147,27 @@ source_label <- function(entry) {
          if (!is.null(entry$frequency)) paste0(" · ", entry$frequency) else "")
 }
 
-#' Format a scalar value for the tile headline (magnitude-aware), with unit.
+# Units whose series are counted in whole units (thousands; millions of dollars).
+.WHOLE_UNITS <- c("k", "$M")
+
+#' Format a scalar value for the tile headline (magnitude-aware), with unit. Values of
+#' 1,000 or more, and series in .WHOLE_UNITS, show as whole numbers, rounded (formatC's
+#' "d" alone would truncate).
 format_value <- function(v, unit = NULL) {
   if (is.null(v) || is.na(v)) return("—")
-  txt <- if (abs(v) >= 1000) formatC(v, format = "d", big.mark = ",")
+  txt <- if (abs(v) >= 1000 || isTRUE(unit %in% .WHOLE_UNITS)) formatC(round(v), format = "d", big.mark = ",")
          else if (abs(v) >= 100) formatC(v, format = "f", digits = 1)
          else formatC(v, format = "f", digits = 2)
   if (!is.null(unit) && nzchar(unit)) paste(txt, unit) else txt
 }
 
-#' Format the change vs the prior observation, magnitude-aware, signed.
-format_change <- function(d) {
+#' Format the change vs the prior observation, magnitude-aware, signed (whole numbers
+#' as in format_value(), except that a change under one unit keeps its decimals: temp-help
+#' employment, in thousands with one decimal, can move by 0.2, which would read "+0").
+format_change <- function(d, unit = NULL) {
   if (is.null(d) || is.na(d)) return("")
-  if (abs(d) >= 1000) formatC(d, format = "d", big.mark = ",", flag = "+")
+  whole <- isTRUE(unit %in% .WHOLE_UNITS) && (abs(d) >= 1 || d == 0)
+  if (abs(d) >= 1000 || whole) formatC(round(d), format = "d", big.mark = ",", flag = "+")
   else if (abs(d) >= 100) formatC(d, format = "f", digits = 1, flag = "+")
   else formatC(d, format = "f", digits = 2, flag = "+")
 }

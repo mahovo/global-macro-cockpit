@@ -7,7 +7,7 @@ TONE_CLASS  <- c(good = "text-bg-success", warn = "text-bg-warning",
 
 # Info icon (ⓘ) with a popover. trigger = "focus" opens it on click and dismisses
 # it on outside-click (closing any other open one); the icon needs tabindex to be
-# focusable. Esc is handled by ESC_DISMISS_JS.
+# focusable. Esc, and clicks on links inside a popover, are handled by POPOVER_JS.
 help_popover <- function(title, body, placement = "left") {
   bslib::popover(
     htmltools::span(class = "ms-1", tabindex = "0", role = "button",
@@ -18,12 +18,25 @@ help_popover <- function(title, body, placement = "left") {
   )
 }
 
-info_popover <- function(entry) help_popover(display_title(entry), card_help(entry))
+# Link into the user guide, opened in a new tab so the dashboard keeps its state.
+# `anchor` is a tile id or "tab-<view id>". GUIDE_URL is the public guide; the static
+# build links to the copy beside its page instead (scripts/build_site.R).
+GUIDE_URL <- "https://mahovo.github.io/global-macro-cockpit/guide/"
+guide_link <- function(anchor = NULL, text = "More in the guide ›") {
+  htmltools::tags$a(href = paste0(GUIDE_URL, if (!is.null(anchor)) paste0("#", anchor)),
+                    target = "_blank", rel = "noopener", text)
+}
 
-# Pressing Esc blurs the focused element, which dismisses a focus-trigger popover.
-ESC_DISMISS_JS <- htmltools::tags$script(htmltools::HTML(
-  "document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && document.activeElement) document.activeElement.blur(); });"
-))
+info_popover <- function(entry) help_popover(display_title(entry),
+  htmltools::tagList(card_help(entry), htmltools::div(class = "mt-1", guide_link(entry$id))))
+
+# Pressing Esc blurs the focused element, which dismisses a focus-trigger popover. A
+# mousedown on a link inside a popover would move the focus too, and the popover would
+# close before the click landed, so the focus stays where it is.
+POPOVER_JS <- htmltools::tags$script(htmltools::HTML(paste(
+  "document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && document.activeElement) document.activeElement.blur(); });",
+  "document.addEventListener('mousedown', function(e){ if (e.target.closest && e.target.closest('.popover a')) e.preventDefault(); });",
+  sep = "\n")))
 
 # --- tile contents, shared by the app's renderers and the static build --------
 
@@ -35,7 +48,7 @@ value_label <- function(df, mode, unit) {
 }
 
 # Arrow + change vs the prior observation, in the chosen display mode.
-change_tag <- function(df, mode) {
+change_tag <- function(df, mode, unit = NULL) {
   d <- apply_mode(df, mode)
   if (is.null(d) || nrow(d) < 2) return(NULL)
   ch <- dplyr::last(d$value) - d$value[nrow(d) - 1]
@@ -44,7 +57,7 @@ change_tag <- function(df, mode) {
   lab <- switch(mode,
     z   = sprintf("%+.2fσ", ch),
     pct = sprintf("%+d pct", as.integer(round(ch))),
-    format_change(ch))
+    format_change(ch, unit))
   htmltools::tags$span(htmltools::HTML(arrow), style = sprintf("color:%s", colour),
     htmltools::tags$span(style = "color:#6c757d", sprintf(" %s vs prior", lab)))
 }
