@@ -10,6 +10,9 @@ indicator.
 
 **Live, static public edition:** https://mahovo.github.io/global-macro-cockpit/
 
+**User guide:** https://mahovo.github.io/global-macro-cockpit/guide/ — the structure,
+every tab and tile, how each indicator is computed and how to read it.
+
 > The public site is a static, daily-rebuilt snapshot of an interactive dashboard
 > developed for private use. It is deliberately limited to comply with data-licensing
 > terms and security requirements: indicators whose licences do not permit
@@ -81,17 +84,19 @@ limiting. If you run it, you are responsible for respecting each data provider's
 In particular, the S&P 500, the ICE BofA credit spreads and the S&P Cotality
 Case-Shiller index are copyrighted: fine to view for personal use, not to republish.
 
-To build the static site locally:
+To build the static site and the user guide locally:
 
 ```bash
-Rscript scripts/build_site.R   # writes _site/
+Rscript scripts/build_site.R    # writes _site/
+Rscript scripts/build_guide.R   # writes _site/guide/ (needs pandoc 2.12 or later)
 ```
 
 ## How the public site is built
 
 `.github/workflows/pages.yml` runs on every push to `main`, daily at 06:17 UTC, and on
-demand. It installs R and the dependencies, runs `scripts/build_site.R` with the
-`FRED_API_KEY` repository secret, and deploys `_site/` to GitHub Pages. The build:
+demand. It installs R, the dependencies and pandoc, runs `scripts/build_site.R` with the
+`FRED_API_KEY` repository secret and then `scripts/build_guide.R`, and deploys `_site/`
+to GitHub Pages. The build:
 
 1. reads the series registry and `instructions/data_licenses.csv`;
 2. fetches only series whose licence permits republication — anything not listed in
@@ -99,7 +104,10 @@ demand. It installs R and the dependencies, runs `scripts/build_site.R` with the
 3. stops without deploying if fewer than 90 % of those series resolve, so the last good
    site stays live;
 4. renders the same tiles as the local app into one static page with interactive
-   plotly charts.
+   plotly charts;
+5. renders the user guide from the Markdown in `guide/`, filling in each tile's source,
+   licence, frequency, unit and badge rules from the code. A tile without a guide section
+   stops a local build; in the workflow it is a warning, so it never blocks a deploy.
 
 GitHub pauses scheduled workflows in public repositories after 60 days without activity;
 if that happens, re-enable the workflow from the Actions tab.
@@ -146,6 +154,7 @@ completeness or timeliness.
 app.R                        local Shiny app (live edition)
 scripts/
   build_site.R               static public edition -> _site/
+  build_guide.R              user guide (guide/) -> _site/guide/
   validate_registry.R        checks which registry series resolve -> registry_coverage.csv
   audit_licenses.R           re-checks FRED copyright status of the licence table
 R/
@@ -167,6 +176,8 @@ instructions/
   data_licenses.csv          licence class and credit per displayed series
   registry_coverage.csv      generated resolution report
   global-macro-cockpit.md    the original design brief
+guide/                       user guide: Markdown per part and per tab (tabs/), appendices,
+                             page template, CSS and the STIX Two Math font (SIL OFL)
 .github/workflows/pages.yml  build and deploy to GitHub Pages
 ```
 
@@ -179,6 +190,8 @@ instructions/
    `R/assess.R`, and help text in `R/help.R`.
 3. Add a row to `instructions/data_licenses.csv` after checking its licence. Until it has
    one, the public site shows it as a link only.
+4. Write its section in the user guide, in `guide/tabs/<tab id>.md`: a line
+   `{{tile <id>}}`, then the text. `scripts/build_guide.R` stops locally until it has one.
 
 ## How this was built
 

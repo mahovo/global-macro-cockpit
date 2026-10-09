@@ -26,10 +26,17 @@ jobs:
 
       - uses: r-lib/actions/setup-r-dependencies@465b7d8e732ca3921382b1674c59bada9cbf3399 # v2
 
+      - uses: r-lib/actions/setup-pandoc@465b7d8e732ca3921382b1674c59bada9cbf3399 # v2
+        with:
+          pandoc-version: "3.2"   # the version the guide is checked with locally
+
       - name: Build static site
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: Rscript scripts/build_site.R
+
+      - name: Build user guide   # after the site build, which clears _site/
+        run: Rscript scripts/build_guide.R
 
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:

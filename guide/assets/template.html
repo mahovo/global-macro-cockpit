@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>$pagetitle$</title>
+  <meta name="description" content="User guide to the Global Macro Cockpit: the structure, every tab and tile, how each indicator is computed and how to read it.">
+  <link rel="stylesheet" href="guide.css?v=$version$">
+</head>
+<body>
+<header class="masthead">
+  <a class="home" href="../">&lsaquo; Global Macro Cockpit</a>
+  <span class="doc">User guide</span>
+</header>
+<div class="layout">
+  <details class="toc" id="toc">
+    <summary>Contents</summary>
+    <nav aria-label="Contents">
+$toc$
+    </nav>
+  </details>
+  <main>
+$body$
+    <footer class="colophon">
+      Built $built$ from the dashboard's own registry, titles, units and licence records.
+      Not investment advice. Formulas typeset in MathML; fallback font STIX Two Math (SIL Open Font Licence).
+    </footer>
+  </main>
+</div>
+<script>
+(function () {
+  var toc = document.getElementById('toc');
+  var wide = window.matchMedia('(min-width: 1000px)');
+  function sync() { if (wide.matches) toc.open = true; }
+  sync(); wide.addEventListener('change', sync);
+  // Highlight the section being read in the contents.
+  var links = {};
+  toc.querySelectorAll('a[href^="#"]').forEach(function (a) { links[a.getAttribute('href').slice(1)] = a; });
+  var current = null;
+  var spy = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      var a = links[e.target.id]; if (!a) return;
+      if (current) current.classList.remove('here');
+      a.classList.add('here'); current = a;
+      if (wide.matches && a.scrollIntoView) {
+        var r = a.getBoundingClientRect(), n = toc.getBoundingClientRect();
+        if (r.top < n.top || r.bottom > n.bottom) a.scrollIntoView({ block: 'nearest' });
+      }
+    });
+  }, { rootMargin: '0px 0px -80% 0px' });
+  document.querySelectorAll('main h1[id], main h2[id], main h3[id]').forEach(function (h) { spy.observe(h); });
+})();
+</script>
+</body>
+</html>
